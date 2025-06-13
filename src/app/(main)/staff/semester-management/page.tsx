@@ -57,9 +57,7 @@ export default function SemesterManagementPage() {
 
   const handleOpenEditDialog = (semester: Semester) => {
     setEditingSemester(semester);
-    // setIsEditDialogOpen(true); // This would open an edit form
-    toast({ title: 'Edit Semester (Mock)', description: `Dialog to edit ${semester.name} would open here. Not yet implemented.` });
-    // setIsEditDialogOpen(false); // Close immediately as it's a placeholder for now
+    setIsEditDialogOpen(true);
   };
 
   const handleDeleteSemester = (semesterId: number) => {
@@ -69,7 +67,7 @@ export default function SemesterManagementPage() {
     console.log(`Attempting to delete semester: ${semesterId}`);
     // Mock deletion
     setSemestersList(prev => prev.filter(s => s.semester_id !== semesterId));
-    toast({ title: 'Semester Deleted (Mock)', description: `Semester ${semesterToDelete.name} has been removed.` });
+    toast({ title: 'Semester Deleted (Mock)', description: `Semester ${semesterToDelete.name} has been removed from the list.` });
   };
   
   const handleAddSemesterSubmit = async (data: NewSemesterFormData) => {
@@ -179,10 +177,10 @@ export default function SemesterManagementPage() {
                         </DropdownMenuTrigger>
                         <DropdownMenuContent align="end">
                           <DropdownMenuItem onClick={() => handleOpenEditDialog(semester)}>
-                            <Edit className="mr-2 h-4 w-4" /> Edit (Mock)
+                            <Edit className="mr-2 h-4 w-4" /> Edit
                           </DropdownMenuItem>
                           <DropdownMenuItem onClick={() => handleDeleteSemester(semester.semester_id)} className="text-destructive focus:text-destructive focus:bg-destructive/10">
-                            <Trash2 className="mr-2 h-4 w-4" /> Delete (Mock)
+                            <Trash2 className="mr-2 h-4 w-4" /> Delete
                           </DropdownMenuItem>
                         </DropdownMenuContent>
                       </DropdownMenu>
@@ -223,22 +221,29 @@ export default function SemesterManagementPage() {
         </div>
       )}
 
-       {/* Edit Dialog (Placeholder) - In a real app, this would have its own form */}
-      {editingSemester && isEditDialogOpen && (
-        <Dialog open={isEditDialogOpen} onOpenChange={setIsEditDialogOpen}>
+      {editingSemester && (
+        <Dialog open={isEditDialogOpen} onOpenChange={(isOpen) => {
+          setIsEditDialogOpen(isOpen);
+          if (!isOpen) setEditingSemester(null);
+        }}>
           <DialogContent className="sm:max-w-[600px]">
             <DialogHeader>
-              <DialogTitle>Edit Semester: {editingSemester.name} (Mock)</DialogTitle>
+              <DialogTitle>Edit Semester: {editingSemester.name}</DialogTitle>
               <DialogDescription>
                 Semester editing form will be implemented here.
               </DialogDescription>
             </DialogHeader>
             <div className="py-4 text-center text-muted-foreground">
                 <p>Form to edit semester details for "{editingSemester.name}" will go here.</p>
+                <p className="mt-2">For now, this is a placeholder.</p>
             </div>
             <div className="flex justify-end space-x-2 pt-4">
-              <Button type="button" variant="outline" onClick={() => setIsEditDialogOpen(false)}>Cancel</Button>
-              <Button onClick={() => { /* Mock save */ toast({title: "Changes Saved (Mock)"}); setIsEditDialogOpen(false); }}>Save Changes (Mock)</Button>
+              <Button type="button" variant="outline" onClick={() => {setIsEditDialogOpen(false); setEditingSemester(null);}}>Cancel</Button>
+              <Button onClick={() => { 
+                toast({title: "Changes Saved (Mock)", description: `Semester "${editingSemester.name}" would be updated.`}); 
+                setIsEditDialogOpen(false); 
+                setEditingSemester(null); 
+              }}>Save Changes (Mock)</Button>
             </div>
           </DialogContent>
         </Dialog>
