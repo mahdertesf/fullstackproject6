@@ -56,7 +56,7 @@ export default function StudyGuideAndMaterialsPage() {
           ? mockCourseMaterials.filter(cm => cm.scheduled_course_id === scheduledCourse.scheduled_course_id) 
           : [];
 
-        return { registration, scheduledCourse, courseDetails, semesterDetails, materials, teacherDetails };
+        return { registration: reg, scheduledCourse, courseDetails, semesterDetails, materials, teacherDetails };
       }).filter(item => item.courseDetails && item.semesterDetails);
 
       const semesterMap = new Map<number, StudentCourseWithMaterials[]>();
