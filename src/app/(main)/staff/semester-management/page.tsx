@@ -16,6 +16,7 @@ import type { Semester } from '@/types';
 import { useToast } from '@/hooks/use-toast';
 import { format } from 'date-fns';
 import AddSemesterForm from '@/components/semesters/AddSemesterForm';
+import EditSemesterForm from '@/components/semesters/EditSemesterForm';
 import { type NewSemesterFormData } from '@/lib/schemas';
 
 const ITEMS_PER_PAGE = 10;
@@ -39,7 +40,6 @@ export default function SemesterManagementPage() {
   }, [user, router]);
 
   const paginatedSemesters = useMemo(() => {
-    // Sort semesters by start date descending for recent ones first
     const sortedSemesters = [...semestersList].sort((a, b) => new Date(b.start_date).getTime() - new Date(a.start_date).getTime());
     return sortedSemesters.slice(
       (currentPage - 1) * ITEMS_PER_PAGE,
@@ -65,7 +65,6 @@ export default function SemesterManagementPage() {
     if (!semesterToDelete) return;
 
     console.log(`Attempting to delete semester: ${semesterId}`);
-    // Mock deletion
     setSemestersList(prev => prev.filter(s => s.semester_id !== semesterId));
     toast({ title: 'Semester Deleted (Mock)', description: `Semester ${semesterToDelete.name} has been removed from the list.` });
   };
@@ -73,7 +72,7 @@ export default function SemesterManagementPage() {
   const handleAddSemesterSubmit = async (data: NewSemesterFormData) => {
     setIsSubmitting(true);
     console.log("New semester data:", data);
-    await new Promise(resolve => setTimeout(resolve, 1000)); // Simulate API call
+    await new Promise(resolve => setTimeout(resolve, 1000)); 
 
     const newSemesterId = Math.max(...semestersList.map(s => s.semester_id), 0) + 1;
     const newSemester: Semester = {
@@ -99,6 +98,41 @@ export default function SemesterManagementPage() {
     });
     setIsSubmitting(false);
     setIsAddDialogOpen(false);
+  };
+
+  const handleEditSemesterSubmit = async (data: NewSemesterFormData) => {
+    if (!editingSemester) return;
+    setIsSubmitting(true);
+    console.log("Editing semester data:", editingSemester.semester_id, data);
+    await new Promise(resolve => setTimeout(resolve, 1000));
+
+    setSemestersList(prev => 
+      prev.map(s => 
+        s.semester_id === editingSemester.semester_id 
+          ? { 
+              ...s, 
+              name: data.name,
+              academic_year: data.academic_year,
+              term: data.term,
+              start_date: format(data.start_date, 'yyyy-MM-dd'),
+              end_date: format(data.end_date, 'yyyy-MM-dd'),
+              registration_start_date: data.registration_start_date.toISOString(),
+              registration_end_date: data.registration_end_date.toISOString(),
+              add_drop_start_date: data.add_drop_start_date.toISOString(),
+              add_drop_end_date: data.add_drop_end_date.toISOString(),
+              updated_at: new Date().toISOString(),
+            } 
+          : s
+      )
+    );
+    
+    toast({
+      title: 'Semester Updated (Mock)',
+      description: `Semester ${data.name} has been updated.`,
+    });
+    setIsSubmitting(false);
+    setIsEditDialogOpen(false);
+    setEditingSemester(null);
   };
 
 
@@ -226,25 +260,19 @@ export default function SemesterManagementPage() {
           setIsEditDialogOpen(isOpen);
           if (!isOpen) setEditingSemester(null);
         }}>
-          <DialogContent className="sm:max-w-[600px]">
+          <DialogContent className="sm:max-w-2xl">
             <DialogHeader>
               <DialogTitle>Edit Semester: {editingSemester.name}</DialogTitle>
               <DialogDescription>
-                Semester editing form will be implemented here.
+                Modify the semester details below.
               </DialogDescription>
             </DialogHeader>
-            <div className="py-4 text-center text-muted-foreground">
-                <p>Form to edit semester details for "{editingSemester.name}" will go here.</p>
-                <p className="mt-2">For now, this is a placeholder.</p>
-            </div>
-            <div className="flex justify-end space-x-2 pt-4">
-              <Button type="button" variant="outline" onClick={() => {setIsEditDialogOpen(false); setEditingSemester(null);}}>Cancel</Button>
-              <Button onClick={() => { 
-                toast({title: "Changes Saved (Mock)", description: `Semester "${editingSemester.name}" would be updated.`}); 
-                setIsEditDialogOpen(false); 
-                setEditingSemester(null); 
-              }}>Save Changes (Mock)</Button>
-            </div>
+            <EditSemesterForm
+              semesterToEdit={editingSemester}
+              onSubmit={handleEditSemesterSubmit}
+              onCancel={() => { setIsEditDialogOpen(false); setEditingSemester(null); }}
+              isSubmitting={isSubmitting}
+            />
           </DialogContent>
         </Dialog>
       )}
