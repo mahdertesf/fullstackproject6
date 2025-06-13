@@ -1,7 +1,7 @@
 
 import type { UserRole } from '@/types';
 import type { LucideIcon } from 'lucide-react';
-import { Home, BookOpen, Users, Building, FileText, Settings, Speaker, BarChart3, GraduationCap, Edit3, ShieldCheck, Megaphone, ListChecks, HardHat, UserCircle } from 'lucide-react';
+import { Home, BookOpen, Users, Building, FileText, Settings, Speaker, BarChart3, GraduationCap, Edit3, ShieldCheck, Megaphone, ListChecks, HardHat, UserCircle, Layers } from 'lucide-react';
 
 export interface NavLink {
   href: string;
@@ -18,6 +18,7 @@ export const navLinks: NavLink[] = [
   { href: '/departments', label: 'Departments', icon: Building, roles: 'all' },
   
   // Student specific
+  { href: '/student/my-courses', label: 'My Courses', icon: Layers, roles: ['Student'] },
   { href: '/student/my-schedule', label: 'My Schedule', icon: FileText, roles: ['Student'] },
   { href: '/student/register', label: 'Course Registration', icon: Edit3, roles: ['Student'] },
   { href: '/student/transcript', label: 'My Transcript', icon: GraduationCap, roles: ['Student'] },
@@ -73,3 +74,4 @@ export const getFilteredNavLinks = (role: UserRole, isSuperAdmin: boolean = fals
       return order.indexOf(a.label) - order.indexOf(b.label);
   });
 };
+

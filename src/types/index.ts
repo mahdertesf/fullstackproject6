@@ -155,16 +155,16 @@ export type MaterialType = 'File' | 'Link';
 
 export interface CourseMaterial {
   material_id: number;
-  scheduled_course_id: number;
+  scheduled_course_id: number; // Links material to a specific offering of a course
   title: string;
   description?: string | null;
   material_type: MaterialType;
-  file_path?: string | null;
-  url?: string | null;
-  uploaded_by: number; // Corresponds to UserProfile.user_id for a teacher
+  file_path?: string | null; // For 'File' type, path to the stored file
+  url?: string | null;       // For 'Link' type, the actual URL
+  uploaded_by: number; // User ID of the teacher who uploaded
   upload_timestamp: string;
-  scheduledCourse?: ScheduledCourse; 
-  uploader?: UserProfile; 
+  scheduledCourse?: ScheduledCourse; // Optional: for joining
+  uploader?: UserProfile; // Optional: for joining
 }
 
 export interface AuditLog {
@@ -240,6 +240,7 @@ export interface StudentAssessmentScore {
 // Helper type for enriched registration data used in frontend components
 export interface EnrichedRegistration extends Registration {
   studentProfile?: UserProfile; // The student user profile
+  scheduledCourse?: ScheduledCourse; // The specific section/offering
   courseDetails?: Course; // Details of the course itself
   semesterDetails?: Semester; // Details of the semester
   assessments?: (Assessment & { studentScore?: StudentAssessmentScore })[]; // Assessments for the scheduled course with student's score
@@ -250,3 +251,4 @@ export interface TeacherSectionInfo {
   id: string; // scheduled_course_id
   name: string; // e.g., "SE301 - S1 (Spring 2024)"
 }
+
