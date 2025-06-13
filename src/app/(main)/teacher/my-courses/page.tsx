@@ -91,9 +91,9 @@ export default function TeacherMyCoursesPage() {
                   </p>
               </CardContent>
               <CardFooter>
-                <Button variant="outline" className="w-full" asChild>
+                <Button variant="outline" className="w-full whitespace-normal h-auto py-2" asChild>
                   <Link href={`/teacher/my-courses/${tc.scheduled_course_id}`}>
-                    Manage Course & Materials <ArrowRight className="ml-2 h-4 w-4" />
+                    Manage Course & Materials <ArrowRight className="h-4 w-4" />
                   </Link>
                 </Button>
               </CardFooter>
@@ -112,3 +112,4 @@ export default function TeacherMyCoursesPage() {
     </div>
   );
 }
+
