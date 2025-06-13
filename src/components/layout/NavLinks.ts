@@ -63,4 +63,3 @@ export const getFilteredNavLinks = (role: UserRole, isSuperAdmin: boolean = fals
       return order.indexOf(a.label) - order.indexOf(b.label);
   });
 };
-
