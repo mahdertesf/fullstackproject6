@@ -8,7 +8,7 @@ import { useRouter } from 'next/navigation';
 import { useEffect, useState, useMemo } from 'react';
 import { Layers, ShieldAlert, BookOpenText, FileText, Link as LinkIcon, Download, Wand2, Combine, MessageSquareQuote, HelpCircle, Loader2 } from 'lucide-react';
 import { mockRegistrations, mockCourses, mockSemesters, mockCourseMaterials, mockScheduledCourses, mockUserProfiles } from '@/lib/data';
-import type { UserProfile, Semester, Course, CourseMaterial, Registration, ScheduledCourse } from '@/types';
+import type { UserProfile, Semester, Course, CourseMaterial, Registration, ScheduledCourse, MaterialType } from '@/types';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from '@/components/ui/accordion';
@@ -130,17 +130,24 @@ export default function StudyGuideAndMaterialsPage() {
     try {
       const input: AiStudyGuideMaterialInput = {
         materialTitle: material.title,
-        materialDescription: material.description || '',
+        materialDescription: material.description || undefined,
         courseName: courseName,
         actionType: actionType,
+        materialType: material.material_type,
+        materialPathOrUrl: material.material_type === 'File' ? material.file_path || undefined : material.url || undefined,
       };
       const result = await processCourseMaterial(input);
-      setAiMaterialActionResult(result.generatedText);
-      toast({ title: 'AI Processing Complete', description: `${actionType} action finished for "${material.title}".` });
+      if (result && result.generatedText) {
+        setAiMaterialActionResult(result.generatedText);
+        toast({ title: 'AI Processing Complete', description: `${actionType} action finished for "${material.title}".` });
+      } else {
+        setAiMaterialActionResult('Sorry, I was unable to process this material with the information provided. The AI could not generate a response.');
+        toast({ variant: 'destructive', title: `AI ${actionType} Failed`, description: 'Could not generate a meaningful response for the material.' });
+      }
     } catch (error) {
       console.error(`AI ${actionType} failed:`, error);
-      setAiMaterialActionResult('Sorry, I was unable to process this material at the moment. Please try again.');
-      toast({ variant: 'destructive', title: `AI ${actionType} Failed`, description: 'Could not process material. Please try again.' });
+      setAiMaterialActionResult('Sorry, an unexpected error occurred while processing this material. Please try again.');
+      toast({ variant: 'destructive', title: `AI ${actionType} Failed`, description: 'An unexpected error occurred. Please try again.' });
     } finally {
       setIsAiMaterialActionLoading(false);
     }
