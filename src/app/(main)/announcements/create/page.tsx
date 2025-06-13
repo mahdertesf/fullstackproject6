@@ -1,3 +1,4 @@
+
 'use client';
 
 import PageHeader from '@/components/shared/PageHeader';
@@ -6,15 +7,15 @@ import { useAuthStore } from '@/store/authStore';
 import { useRouter } from 'next/navigation';
 import { useEffect } from 'react';
 import { Speaker, ShieldAlert } from 'lucide-react';
+import type { UserRole } from '@/types';
 
 export default function CreateAnnouncementPage() {
   const { user } = useAuthStore();
   const router = useRouter();
 
   useEffect(() => {
-    // Basic role check for client-side, actual protection would be server-side/middleware
     if (user && user.role !== 'Staff' && !user.isSuperAdmin) {
-      router.replace('/dashboard'); // Redirect if not authorized
+      router.replace('/dashboard'); 
     }
   }, [user, router]);
 
@@ -35,7 +36,7 @@ export default function CreateAnnouncementPage() {
         description="Use the AI-powered generator or write your own announcement."
         icon={Speaker}
       />
-      <AnnouncementGeneratorForm />
+      <AnnouncementGeneratorForm userRole={user.role as UserRole} /> {/* Pass user role */}
     </div>
   );
 }

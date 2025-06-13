@@ -1,4 +1,5 @@
 
+
 export type UserRole = 'Student' | 'Teacher' | 'Staff';
 
 export interface User {
@@ -128,7 +129,7 @@ export interface ScheduledCourse {
   updated_at: string;
   course?: Course; // Optional
   semester?: Semester; // Optional
-  teacher?: Teacher; // Optional
+  teacher?: UserProfile; // Optional - Changed to UserProfile for consistency
   room?: Room; // Optional
 }
 
@@ -141,9 +142,9 @@ export interface Registration {
   registration_date: string;
   status: RegistrationStatus;
   final_grade?: string | null; 
-  grade_points?: number | null; // Store actual grade points earned for the course (e.g., 3 credits * 4.0 for A = 12 points)
+  grade_points?: number | null; 
   updated_at: string;
-  student?: UserProfile; // Changed from Student to UserProfile
+  student?: UserProfile; 
   scheduledCourse?: ScheduledCourse; 
   overall_percentage?: number | null;
   final_letter_grade?: string | null;
@@ -163,7 +164,7 @@ export interface CourseMaterial {
   uploaded_by: number; 
   upload_timestamp: string;
   scheduledCourse?: ScheduledCourse; 
-  uploader?: UserProfile; // Changed from Teacher to UserProfile
+  uploader?: UserProfile; 
 }
 
 export interface AuditLog {
@@ -175,7 +176,7 @@ export interface AuditLog {
   timestamp: string;
   ip_address?: string | null;
   details?: string | null;
-  user?: UserProfile; // Changed from User to UserProfile
+  user?: UserProfile; 
 }
 
 export type AnnouncementStatus = 'Draft' | 'Scheduled' | 'Published' | 'Archived';
@@ -197,23 +198,18 @@ export interface Announcement {
   semester_id?: number | null;
   created_at: string;
   updated_at: string;
-  author?: UserProfile; // Changed from User to UserProfile
+  author?: UserProfile; 
   department?: Department; 
   semester?: Semester; 
+  target_section_ids?: number[]; // For teacher announcements to specific sections
 }
 
 // Combined user profile type for easier handling in profile page
-// Ensure this UserProfile is comprehensive enough for all roles.
 export type UserProfile = User & Partial<Omit<Student, 'student_id'|'department_id'|'enrollment_date'|'updated_at'>> & Partial<Omit<Teacher, 'teacher_id'|'department_id'|'updated_at'>> & Partial<Omit<Staff, 'staff_id'|'updated_at'>> & {
   isSuperAdmin?: boolean;
   profile_picture_url?: string;
-  // Fields from Student
-  department_id?: number; // department_id can come from Student or Teacher
+  department_id?: number; 
   enrollment_date?: string;
-  // Fields from Teacher
-  // office_location is already in Teacher part
-  // Fields from Staff
-  // job_title is already in Staff part
 };
 
 
@@ -223,7 +219,7 @@ export interface Assessment {
   scheduled_course_id: number;
   name: string;
   max_score: number;
-  assessment_type?: string | null; // e.g. Homework, Quiz, Exam
+  assessment_type?: string | null; 
   created_at: string;
   updated_at: string;
 }
@@ -246,5 +242,10 @@ export interface EnrichedRegistration extends Registration {
   semesterDetails?: Semester;
   assessments?: (Assessment & { studentScore?: StudentAssessmentScore })[];
   materials?: CourseMaterial[];
+}
+
+export interface TeacherSectionInfo {
+  id: string; // scheduled_course_id
+  name: string; // e.g., "SE301 - S1 (Spring 2024)"
 }
 

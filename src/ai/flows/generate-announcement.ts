@@ -22,6 +22,7 @@ const GenerateAnnouncementInputSchema = z.object({
       'The desired tone of the announcement (e.g., Formal, Urgent, Friendly).'
     ),
   targetAudience: z.enum(['Students', 'Teachers', 'Staff', 'All Users']).describe('The intended audience for the announcement (e.g., Students, Teachers, All Users).'),
+  sections: z.array(z.string()).optional().describe('The specific course sections this announcement is for, if applicable. E.g., ["SE301 - S1", "MATH202 - S2"]'),
 });
 export type GenerateAnnouncementInput = z.infer<typeof GenerateAnnouncementInputSchema>;
 
@@ -45,6 +46,13 @@ const announcementPrompt = ai.definePrompt({
 
   Based on the provided topic, desired tone, and target audience, generate a suitable title and content for the announcement.
   Ensure the announcement is clear, concise, and appropriate for the intended audience.
+  {{#if sections}}
+  This announcement is specifically for the students in the following course sections:
+  {{#each sections}}
+  - {{{this}}}
+  {{/each}}
+  Tailor the content accordingly if the topic relates to these specific sections.
+  {{/if}}
 
   Topic: {{{topic}}}
   Desired Tone: {{{desiredTone}}}
@@ -66,4 +74,3 @@ const generateAnnouncementFlow = ai.defineFlow(
     return output!;
   }
 );
-

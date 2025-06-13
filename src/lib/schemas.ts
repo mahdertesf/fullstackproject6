@@ -10,7 +10,8 @@ export type LoginFormData = z.infer<typeof LoginSchema>;
 export const AnnouncementGeneratorSchema = z.object({
   topic: z.string().min(3, { message: "Topic must be at least 3 characters long." }),
   desiredTone: z.enum(['Formal', 'Urgent', 'Friendly', 'Informative', 'Academic']), 
-  targetAudience: z.enum(['Students', 'Teachers', 'Staff', 'All Users'], { required_error: "Target audience is required."}),
+  targetAudience: z.enum(['Students', 'Teachers', 'Staff', 'All Users'], { required_error: "Target audience is required."}).optional(), // Optional for teachers
+  selectedSections: z.array(z.string()).optional(), // For teachers to select sections
 });
 export type AnnouncementGeneratorFormData = z.infer<typeof AnnouncementGeneratorSchema>;
 

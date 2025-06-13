@@ -1,6 +1,7 @@
+
 import type { UserRole } from '@/types';
 import type { LucideIcon } from 'lucide-react';
-import { Home, BookOpen, Users, Building, FileText, Settings, Speaker, BarChart3, GraduationCap, Edit3, ShieldCheck } from 'lucide-react';
+import { Home, BookOpen, Users, Building, FileText, Settings, Speaker, BarChart3, GraduationCap, Edit3, ShieldCheck, Megaphone } from 'lucide-react';
 
 export interface NavLink {
   href: string;
@@ -25,6 +26,7 @@ export const navLinks: NavLink[] = [
   // Teacher specific
   { href: '/teacher/my-courses', label: 'My Courses', icon: BookOpen, roles: ['Teacher'] },
   { href: '/teacher/announcements', label: 'Post Announcement', icon: Speaker, roles: ['Teacher']},
+  { href: '/teacher/view-announcements', label: 'View Announcements', icon: Megaphone, roles: ['Teacher']},
 
 
   // Staff specific (Admin also gets these)
@@ -45,15 +47,19 @@ export const getFilteredNavLinks = (role: UserRole, isSuperAdmin: boolean = fals
   return navLinks.filter(link => {
     if (link.roles === 'all') return true;
     if (isSuperAdmin && link.roles === 'superadmin') return true;
-    if (isSuperAdmin && link.roles.includes('Staff')) return true; // SuperAdmin inherits Staff roles
-    return link.roles.includes(role);
+    // SuperAdmin inherits Staff roles, ensure this logic is correct
+    if (isSuperAdmin && Array.isArray(link.roles) && link.roles.includes('Staff')) return true;
+    return Array.isArray(link.roles) && link.roles.includes(role);
   }).map(link => ({
     ...link,
     children: link.children ? link.children.filter(childLink => {
       if (childLink.roles === 'all') return true;
       if (isSuperAdmin && childLink.roles === 'superadmin') return true;
-      if (isSuperAdmin && childLink.roles.includes('Staff')) return true;
-      return childLink.roles.includes(role);
+      if (isSuperAdmin && Array.isArray(childLink.roles) && childLink.roles.includes('Staff')) return true;
+      return Array.isArray(childLink.roles) && childLink.roles.includes(role);
     }) : undefined
-  }));
+  })).sort((a, b) => { // Optional: basic sort order if needed
+      const order = ['Dashboard', 'My Profile', 'My Courses', 'My Schedule', 'Course Catalog', 'Course Registration', 'My Transcript', 'Departments', 'AI Study Guide', 'Post Announcement', 'View Announcements', 'Create Announcement', 'Manage Users', 'Full User Management', 'Manage Courses', 'Manage Semesters', 'Schedule Courses', 'Manage Departments', 'Campus Infrastructure', 'Audit Log'];
+      return order.indexOf(a.label) - order.indexOf(b.label);
+  });
 };
