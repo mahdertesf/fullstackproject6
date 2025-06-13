@@ -6,7 +6,7 @@ import StudyGuideGeneratorForm from '@/components/study-guide/StudyGuideGenerato
 import { useAuthStore } from '@/store/authStore';
 import { useRouter } from 'next/navigation';
 import { useEffect, useState, useMemo } from 'react';
-import { Layers, ShieldAlert, BookOpenText, FileText, Link as LinkIcon, Download, Wand2, Combine, MessageSquareQuestion, HelpCircle } from 'lucide-react';
+import { Layers, ShieldAlert, BookOpenText, FileText, Link as LinkIcon, Download, Wand2, Combine, MessageSquareQuote, HelpCircle } from 'lucide-react';
 import { mockRegistrations, mockCourses, mockSemesters, mockCourseMaterials, mockScheduledCourses, mockUserProfiles } from '@/lib/data';
 import type { UserProfile, Semester, Course, CourseMaterial, Registration, ScheduledCourse } from '@/types';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
@@ -180,7 +180,7 @@ export default function StudyGuideAndMaterialsPage() {
                                             <Combine className="mr-2 h-4 w-4" /> Summarize
                                           </DropdownMenuItem>
                                           <DropdownMenuItem onClick={() => handleAiAction('Generate Questions', material.title)}>
-                                            <MessageSquareQuestion className="mr-2 h-4 w-4" /> Generate Questions
+                                            <MessageSquareQuote className="mr-2 h-4 w-4" /> Generate Questions
                                           </DropdownMenuItem>
                                           <DropdownMenuItem onClick={() => handleAiAction('Explain Details', material.title)}>
                                             <HelpCircle className="mr-2 h-4 w-4" /> Explain Details
