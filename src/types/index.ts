@@ -140,37 +140,15 @@ export interface Registration {
   scheduled_course_id: number;
   registration_date: string;
   status: RegistrationStatus;
-  final_grade?: string | null;
+  final_grade?: string | null; // This will be the letter grade
   grade_points?: number | null;
   updated_at: string;
   student?: Student; // Optional
   scheduledCourse?: ScheduledCourse; // Optional
+  overall_percentage?: number | null;
+  final_letter_grade?: string | null;
 }
 
-export interface Assessment {
-  assessment_id: number;
-  scheduled_course_id: number;
-  name: string;
-  description?: string | null;
-  max_score: number;
-  due_date?: string | null;
-  type?: string | null;
-  created_at: string;
-  updated_at: string;
-  scheduledCourse?: ScheduledCourse; // Optional
-}
-
-export interface StudentAssessment {
-  student_assessment_id: number;
-  registration_id: number;
-  assessment_id: number;
-  score?: number | null;
-  submission_timestamp?: string | null;
-  feedback?: string | null;
-  graded_at?: string | null;
-  registration?: Registration; // Optional
-  assessment?: Assessment; // Optional
-}
 
 export type MaterialType = 'File' | 'Link';
 
@@ -225,3 +203,25 @@ export interface Announcement {
 export type UserProfile = (User & Partial<Student> & Partial<Teacher> & Partial<Staff>) & {
   isSuperAdmin?: boolean;
 };
+
+// For Grade Management
+export interface Assessment {
+  assessment_id: number;
+  scheduled_course_id: number;
+  name: string;
+  max_score: number;
+  assessment_type?: string | null; // e.g. Homework, Quiz, Exam
+  created_at: string;
+  updated_at: string;
+}
+
+export interface StudentAssessmentScore {
+  student_assessment_score_id: number;
+  registration_id: number; // Links to student's enrollment in the course
+  assessment_id: number;
+  score_achieved?: number | null;
+  graded_timestamp?: string | null;
+  feedback?: string | null;
+  assessment?: Assessment; // Optional
+  registration?: Registration; // Optional
+}

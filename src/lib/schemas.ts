@@ -164,3 +164,10 @@ export const CourseMaterialUploadSchema = z.object({
   path: ['url'],
 });
 export type CourseMaterialUploadFormData = z.infer<typeof CourseMaterialUploadSchema>;
+
+export const AssessmentSchema = z.object({
+  name: z.string().min(3, "Assessment name must be at least 3 characters.").max(100, "Name too long"),
+  max_score: z.coerce.number().int().min(1, "Max score must be at least 1.").max(1000, "Max score seems too high."),
+  assessment_type: z.string().optional(),
+});
+export type AssessmentFormData = z.infer<typeof AssessmentSchema>;

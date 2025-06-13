@@ -9,7 +9,7 @@ import { mockScheduledCourses, mockCourses, mockSemesters, mockTeachers, mockRoo
 import type { ScheduledCourse, Course, Semester, Teacher, Room, Building, UserProfile, CourseMaterial } from '@/types';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle, CardFooter } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
-import { ArrowLeft, BookOpenText, ShieldAlert, PlusCircle, Trash2, FileText, Link as LinkIcon, Download } from 'lucide-react';
+import { ArrowLeft, BookOpenText, ShieldAlert, PlusCircle, Trash2, FileText, Link as LinkIcon, Download, GraduationCap } from 'lucide-react';
 import Link from 'next/link';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogTrigger } from '@/components/ui/dialog';
 import UploadMaterialForm from '@/components/materials/UploadMaterialForm';
@@ -152,19 +152,35 @@ export default function TeacherScheduledCourseDetailPage() {
         }
       />
 
-      <Card>
-        <CardHeader>
-          <CardTitle>Course Information</CardTitle>
-        </CardHeader>
-        <CardContent className="space-y-2">
-          <p><strong>Semester:</strong> {scheduledCourse.semesterDetails?.name}</p>
-          <p><strong>Instructor:</strong> {user.first_name} {user.last_name}</p>
-          {scheduledCourse.roomDetails && (
-            <p><strong>Location:</strong> {scheduledCourse.roomDetails.buildingDetails?.name || 'N/A Building'}, Room {scheduledCourse.roomDetails.room_number}</p>
-          )}
-          <p><strong>Schedule:</strong> {scheduledCourse.days_of_week}, {scheduledCourse.start_time?.substring(0,5)} - {scheduledCourse.end_time?.substring(0,5)}</p>
-        </CardContent>
-      </Card>
+      <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+        <Card>
+          <CardHeader>
+            <CardTitle>Course Information</CardTitle>
+          </CardHeader>
+          <CardContent className="space-y-2">
+            <p><strong>Semester:</strong> {scheduledCourse.semesterDetails?.name}</p>
+            <p><strong>Instructor:</strong> {user.first_name} {user.last_name}</p>
+            {scheduledCourse.roomDetails && (
+              <p><strong>Location:</strong> {scheduledCourse.roomDetails.buildingDetails?.name || 'N/A Building'}, Room {scheduledCourse.roomDetails.room_number}</p>
+            )}
+            <p><strong>Schedule:</strong> {scheduledCourse.days_of_week}, {scheduledCourse.start_time?.substring(0,5)} - {scheduledCourse.end_time?.substring(0,5)}</p>
+          </CardContent>
+        </Card>
+        <Card>
+            <CardHeader>
+                <CardTitle>Course Actions</CardTitle>
+            </CardHeader>
+            <CardContent className="flex flex-col space-y-3">
+                 <Button asChild variant="default">
+                    <Link href={`/teacher/my-courses/${scheduledCourseId}/grades`}>
+                        <GraduationCap className="mr-2 h-4 w-4" /> Manage Grades & Assessments
+                    </Link>
+                </Button>
+                {/* Add other actions like "View Roster" etc. here */}
+            </CardContent>
+        </Card>
+      </div>
+      
 
       <Card>
         <CardHeader className="flex flex-row items-center justify-between">
@@ -240,4 +256,3 @@ export default function TeacherScheduledCourseDetailPage() {
     </div>
   );
 }
-
