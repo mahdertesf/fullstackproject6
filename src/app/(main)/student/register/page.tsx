@@ -20,6 +20,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { Edit3, ShieldAlert, CheckCircle, XCircle, AlertTriangle, Info } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
 import Link from 'next/link';
+import { FormLabel } from '@/components/ui/form'; // Added import
 
 interface AvailableCourseForRegistration extends ScheduledCourse {
   courseDetails?: Course;
@@ -104,8 +105,9 @@ export default function StudentCourseRegistrationPage() {
             prerequisitesMet = coursePrereqs.every(p => completedCourseIds.includes(p.prerequisite_course_id));
           }
           
-          const isRegistrationOpen = new Date(selectedSemester.registration_end_date) >= now;
-          const isAddDropOpen = new Date(selectedSemester.add_drop_end_date) >= now;
+          const isRegistrationOpen = new Date(selectedSemester.registration_start_date) <= now && new Date(selectedSemester.registration_end_date) >= now;
+          const isAddDropOpen = new Date(selectedSemester.add_drop_start_date) <= now && new Date(selectedSemester.add_drop_end_date) >= now;
+
 
           const canRegister = !isRegistered && prerequisitesMet && sc.current_enrollment < sc.max_capacity && isRegistrationOpen;
           const canDrop = isRegistered && isAddDropOpen;
@@ -135,7 +137,7 @@ export default function StudentCourseRegistrationPage() {
   }, [user, router, selectedSemesterId, selectedSemester, now]);
 
   const handleRegister = (scheduledCourseId: number) => {
-    if (!user || !selectedSemesterId) return;
+    if (!user || !selectedSemesterId || !selectedSemester) return;
     const studentUser = user as UserProfile;
     const courseToRegister = availableCourses.find(c => c.scheduled_course_id === scheduledCourseId);
 
@@ -154,7 +156,7 @@ export default function StudentCourseRegistrationPage() {
       mockRegistrations.push(newReg);
 
       setAvailableCourses(prev => prev.map(c => 
-        c.scheduled_course_id === scheduledCourseId ? { ...c, isRegistered: true, canRegister: false, current_enrollment: c.current_enrollment + 1, canDrop: new Date(selectedSemester!.add_drop_end_date) >= now } : c
+        c.scheduled_course_id === scheduledCourseId ? { ...c, isRegistered: true, canRegister: false, current_enrollment: c.current_enrollment + 1, canDrop: new Date(selectedSemester!.add_drop_end_date) >= now && new Date(selectedSemester!.add_drop_start_date) <= now } : c
       ));
       setStudentRegistrations(prev => [...prev, newReg]);
       
@@ -175,7 +177,7 @@ export default function StudentCourseRegistrationPage() {
       const regToDrop = studentRegistrations.find(r => r.scheduled_course_id === scheduledCourseId);
       const courseToUpdate = availableCourses.find(c => c.scheduled_course_id === scheduledCourseId);
 
-      if (regToDrop && new Date(selectedSemester.add_drop_end_date) >= now) {
+      if (regToDrop && courseToUpdate?.canDrop) {
         const regIndex = mockRegistrations.findIndex(r => r.registration_id === regToDrop.registration_id);
         if (regIndex > -1) {
             mockRegistrations.splice(regIndex, 1); 
@@ -186,7 +188,7 @@ export default function StudentCourseRegistrationPage() {
             c.scheduled_course_id === scheduledCourseId ? { 
                 ...c, 
                 isRegistered: false, 
-                canRegister: c.prerequisitesMet && (c.current_enrollment -1 < c.max_capacity) && new Date(selectedSemester.registration_end_date) >= now,
+                canRegister: c.prerequisitesMet && (c.current_enrollment -1 < c.max_capacity) && new Date(selectedSemester.registration_start_date) <= now && new Date(selectedSemester.registration_end_date) >= now,
                 current_enrollment: Math.max(0, c.current_enrollment -1),
                 canDrop: false
             } : c
@@ -281,8 +283,8 @@ export default function StudentCourseRegistrationPage() {
                  {sc.current_enrollment >= sc.max_capacity && !sc.isRegistered && (
                      <p className="text-xs text-destructive flex items-center gap-1"><Info className="h-4 w-4"/>Section is full.</p>
                  )}
-                 {selectedSemester && new Date(selectedSemester.registration_end_date) < now && !sc.isRegistered && (
-                    <p className="text-xs text-destructive flex items-center gap-1"><Info className="h-4 w-4"/>Registration deadline passed.</p>
+                 {selectedSemester && !(new Date(selectedSemester.registration_start_date) <= now && new Date(selectedSemester.registration_end_date) >= now) && !sc.isRegistered && (
+                    <p className="text-xs text-destructive flex items-center gap-1"><Info className="h-4 w-4"/>Registration period is closed.</p>
                  )}
               </CardContent>
               <CardFooter>
@@ -294,7 +296,7 @@ export default function StudentCourseRegistrationPage() {
                     disabled={!sc.canDrop}
                    >
                      <XCircle className="mr-2 h-4 w-4" /> Drop Course
-                     {!sc.canDrop && selectedSemester && new Date(selectedSemester.add_drop_end_date) < now && <span className="text-xs ml-1">(Deadline Passed)</span>}
+                     {!sc.canDrop && selectedSemester && !(new Date(selectedSemester.add_drop_start_date) <= now && new Date(selectedSemester.add_drop_end_date) >= now) && <span className="text-xs ml-1">(Deadline Passed)</span>}
                    </Button>
                 ) : (
                   <Button 
@@ -311,7 +313,7 @@ export default function StudentCourseRegistrationPage() {
         </div>
       )}
       {!isLoading && selectedSemester && availableCourses.length === 0 && (
-         <Card><CardContent className="py-6 text-center text-muted-foreground">No courses available in your department for registration in this semester, or all are full/prerequisites not met.</CardContent></Card>
+         <Card><CardContent className="py-6 text-center text-muted-foreground">No courses available in your department for registration in this semester, or all are full/prerequisites not met, or registration is closed.</CardContent></Card>
       )}
     </div>
   );
