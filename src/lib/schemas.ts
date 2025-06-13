@@ -129,3 +129,9 @@ export const DepartmentSchema = z.object({
   description: z.string().max(500, "Description must be 500 characters or less.").optional(),
 });
 export type DepartmentFormData = z.infer<typeof DepartmentSchema>;
+
+export const BuildingFormDataSchema = z.object({
+  name: z.string().min(3, "Building name must be at least 3 characters long.").max(100, "Building name must be 100 characters or less."),
+  address: z.string().max(255, "Address must be 255 characters or less.").optional(),
+});
+export type BuildingFormData = z.infer<typeof BuildingFormDataSchema>;
