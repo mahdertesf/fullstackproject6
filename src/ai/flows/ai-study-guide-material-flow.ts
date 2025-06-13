@@ -22,6 +22,16 @@ const AiStudyGuideMaterialInputSchema = z.object({
 });
 export type AiStudyGuideMaterialInput = z.infer<typeof AiStudyGuideMaterialInputSchema>;
 
+// Schema for the augmented input that the prompt will receive
+const AiStudyGuideMaterialPromptAugmentedInputSchema = AiStudyGuideMaterialInputSchema.extend({
+  isMaterialTypeLink: z.boolean().describe('True if the material type is Link.'),
+  isActionTypeSummarize: z.boolean().describe('True if the action type is Summarize.'),
+  isActionTypeGenerateQuestions: z.boolean().describe('True if the action type is GenerateQuestions.'),
+  isActionTypeExplainDetails: z.boolean().describe('True if the action type is ExplainDetails.'),
+});
+type AiStudyGuideMaterialPromptAugmentedInput = z.infer<typeof AiStudyGuideMaterialPromptAugmentedInputSchema>;
+
+
 const AiStudyGuideMaterialOutputSchema = z.object({
   generatedText: z.string().describe('The AI-generated text based on the requested action.'),
 });
@@ -33,7 +43,7 @@ export async function processCourseMaterial(input: AiStudyGuideMaterialInput): P
 
 const prompt = ai.definePrompt({
   name: 'aiStudyGuideMaterialPrompt',
-  input: {schema: AiStudyGuideMaterialInputSchema},
+  input: {schema: AiStudyGuideMaterialPromptAugmentedInputSchema}, // Use augmented schema
   output: {schema: AiStudyGuideMaterialOutputSchema},
   prompt: `You are an AI study assistant for a university student.
 The student is studying the course: "{{courseName}}".
@@ -45,7 +55,7 @@ Material Description: "{{materialDescription}}"
 {{/if}}
 Material Type: {{materialType}}
 {{#if materialPathOrUrl}}
-  {{#if (eq materialType "Link")}}
+  {{#if isMaterialTypeLink}}
 Source Link: {{materialPathOrUrl}}
   {{else}}
 (This is a file, its content is not directly available to you, the AI. Base your response on the title, description, and your general knowledge of the topic in the context of the course.)
@@ -57,22 +67,22 @@ The student wants you to perform the following action: {{actionType}}.
 Please use your general knowledge about the topic "{{materialTitle}}" as it relates to the course "{{courseName}}".
 If the material is a Link, consider what such a resource typically covers.
 
-{{#if (eq actionType "Summarize")}}
-  {{#if (eq materialType "Link")}}
+{{#if isActionTypeSummarize}}
+  {{#if isMaterialTypeLink}}
     Based on the title, description, and your general knowledge of what a resource like "{{materialTitle}}" (from {{materialPathOrUrl}}) typically covers for the course "{{courseName}}", please provide a concise summary of the likely key topics and concepts.
   {{else}}
     Based on the title and description of the material "{{materialTitle}}" for the course "{{courseName}}", and your general knowledge, please provide a concise summary of the likely key topics and concepts.
   {{/if}}
   Response:
-{{else if (eq actionType "GenerateQuestions")}}
-  {{#if (eq materialType "Link")}}
+{{else if isActionTypeGenerateQuestions}}
+  {{#if isMaterialTypeLink}}
     Considering a resource like "{{materialTitle}}" (from {{materialPathOrUrl}}) for the course "{{courseName}}", generate 3-5 potential exam or study questions based on the typical content of such a resource.
   {{else}}
     Based on the title and description of the material "{{materialTitle}}" for the course "{{courseName}}", and your general knowledge of its likely content, generate 3-5 potential exam or study questions.
   {{/if}}
   Response:
-{{else if (eq actionType "ExplainDetails")}}
-  {{#if (eq materialType "Link")}}
+{{else if isActionTypeExplainDetails}}
+  {{#if isMaterialTypeLink}}
     For a resource like "{{materialTitle}}" (from {{materialPathOrUrl}}) relevant to the course "{{courseName}}", explain any complex concepts or provide further details that would typically be important for understanding it.
   {{else}}
     Based on the title and description of the material "{{materialTitle}}" for the course "{{courseName}}", and your general knowledge, explain any complex concepts or provide further details that would typically be important for understanding it.
@@ -88,11 +98,18 @@ Response:
 const aiStudyGuideMaterialFlow = ai.defineFlow(
   {
     name: 'aiStudyGuideMaterialFlow',
-    inputSchema: AiStudyGuideMaterialInputSchema,
+    inputSchema: AiStudyGuideMaterialInputSchema, // Flow input remains the original schema
     outputSchema: AiStudyGuideMaterialOutputSchema,
   },
-  async input => {
-    const {output} = await prompt(input);
+  async (input: AiStudyGuideMaterialInput) => { // Flow receives the original input type
+    const augmentedInput: AiStudyGuideMaterialPromptAugmentedInput = {
+      ...input,
+      isMaterialTypeLink: input.materialType === 'Link',
+      isActionTypeSummarize: input.actionType === 'Summarize',
+      isActionTypeGenerateQuestions: input.actionType === 'GenerateQuestions',
+      isActionTypeExplainDetails: input.actionType === 'ExplainDetails',
+    };
+    const {output} = await prompt(augmentedInput); // Pass augmented input to the prompt
     if (!output?.generatedText) {
         // If the output is empty or doesn't conform, provide a fallback response.
         return { generatedText: "I received your request, but I couldn't generate a specific response for this material with the provided information. Please ensure the title and description are clear, or try a different material." };
