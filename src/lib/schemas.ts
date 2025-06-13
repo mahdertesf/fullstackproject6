@@ -123,3 +123,9 @@ export const ScheduleCourseSchema = z.object({
   path: ["end_time"],
 });
 export type ScheduleCourseFormData = z.infer<typeof ScheduleCourseSchema>;
+
+export const DepartmentSchema = z.object({
+  name: z.string().min(3, "Department name must be at least 3 characters long.").max(100, "Department name must be 100 characters or less."),
+  description: z.string().max(500, "Description must be 500 characters or less.").optional(),
+});
+export type DepartmentFormData = z.infer<typeof DepartmentSchema>;
