@@ -53,3 +53,12 @@ export const EditUserSchema = z.object({
   is_active: z.boolean().default(true),
 });
 export type EditUserFormData = z.infer<typeof EditUserSchema>;
+
+export const NewCourseSchema = z.object({
+  course_code: z.string().min(3, "Course code must be at least 3 characters.").max(10, "Course code cannot exceed 10 characters."),
+  title: z.string().min(5, "Title must be at least 5 characters."),
+  description: z.string().optional(),
+  credits: z.coerce.number().min(0, "Credits cannot be negative.").max(10, "Credits seem too high."),
+  department_id: z.string({ required_error: "Department is required."}).min(1, "Department is required."),
+});
+export type NewCourseFormData = z.infer<typeof NewCourseSchema>;

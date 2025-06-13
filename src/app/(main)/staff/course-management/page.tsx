@@ -5,29 +5,49 @@ import PageHeader from '@/components/shared/PageHeader';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { useAuthStore } from '@/store/authStore';
 import { useRouter } from 'next/navigation';
-import { useEffect } from 'react';
-import { BookMarked, ShieldAlert, PlusCircle } from 'lucide-react';
+import { useEffect, useState, useMemo } from 'react';
+import { BookMarked, ShieldAlert, PlusCircle, Loader2 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from '@/components/ui/dropdown-menu';
+import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog';
 import { MoreHorizontal, Edit, Trash2, Search, Filter } from 'lucide-react';
-import { mockCourses, mockDepartments } from '@/lib/data'; // Assuming you have mock data
-import type { Course } from '@/types';
-import { useState, useMemo } from 'react';
+import { mockCourses, mockDepartments } from '@/lib/data'; 
+import type { Course, Department } from '@/types';
 import { Badge } from '@/components/ui/badge';
+import AddCourseForm from '@/components/courses/AddCourseForm';
+import { NewCourseFormData } from '@/lib/schemas';
+import { useToast } from '@/hooks/use-toast';
 
 
 const ITEMS_PER_PAGE = 10;
 
+interface CourseWithDepartmentName extends Course {
+  departmentName: string;
+}
+
 export default function CourseManagementPage() {
   const { user } = useAuthStore();
   const router = useRouter();
+  const { toast } = useToast();
 
   const [searchTerm, setSearchTerm] = useState('');
   const [selectedDepartment, setSelectedDepartment] = useState<string>('all');
   const [currentPage, setCurrentPage] = useState(1);
+  const [isAddCourseDialogOpen, setIsAddCourseDialogOpen] = useState(false);
+  const [isSubmitting, setIsSubmitting] = useState(false);
+  
+  // Initialize coursesList with mock data enhanced with department names
+  const initialCoursesWithDept = useMemo(() => {
+    return mockCourses.map(course => ({
+      ...course,
+      departmentName: mockDepartments.find(dept => dept.department_id === course.department_id)?.name || 'N/A',
+    }));
+  }, []);
+  const [coursesList, setCoursesList] = useState<CourseWithDepartmentName[]>(initialCoursesWithDept);
+
 
   useEffect(() => {
     if (user && user.role !== 'Staff' && !user.isSuperAdmin) {
@@ -35,15 +55,8 @@ export default function CourseManagementPage() {
     }
   }, [user, router]);
 
-  const coursesWithDepartments = useMemo(() => {
-    return mockCourses.map(course => ({
-      ...course,
-      departmentName: mockDepartments.find(dept => dept.department_id === course.department_id)?.name || 'N/A',
-    }));
-  }, []);
-
   const filteredCourses = useMemo(() => {
-    return coursesWithDepartments.filter(course => {
+    return coursesList.filter(course => {
       const matchesSearchTerm =
         course.title.toLowerCase().includes(searchTerm.toLowerCase()) ||
         course.course_code.toLowerCase().includes(searchTerm.toLowerCase());
@@ -54,7 +67,7 @@ export default function CourseManagementPage() {
       
       return matchesSearchTerm && matchesDepartment;
     });
-  }, [coursesWithDepartments, searchTerm, selectedDepartment]);
+  }, [coursesList, searchTerm, selectedDepartment]);
 
   const totalPages = Math.ceil(filteredCourses.length / ITEMS_PER_PAGE);
   const paginatedCourses = filteredCourses.slice(
@@ -70,12 +83,41 @@ export default function CourseManagementPage() {
 
   const handleEditCourse = (courseId: number) => {
     console.log(`Edit course: ${courseId}`);
-    // Implement edit functionality
+    toast({ title: 'Edit Course (Not Implemented)', description: `Functionality to edit course ${courseId} is not yet fully implemented.` });
   };
 
   const handleDeleteCourse = (courseId: number) => {
     console.log(`Delete course: ${courseId}`);
-    // Implement delete functionality
+    toast({ title: 'Delete Course (Not Implemented)', description: `Functionality to delete course ${courseId} is not yet fully implemented.` });
+  };
+
+  const handleAddNewCourse = async (data: NewCourseFormData) => {
+    setIsSubmitting(true);
+    console.log("New course data:", data);
+    await new Promise(resolve => setTimeout(resolve, 1000)); 
+
+    const newCourseId = Math.max(...coursesList.map(c => c.course_id), 0) + 1;
+    const department = mockDepartments.find(d => d.department_id === parseInt(data.department_id));
+    
+    const newCourse: CourseWithDepartmentName = {
+      course_id: newCourseId,
+      course_code: data.course_code,
+      title: data.title,
+      description: data.description || null,
+      credits: data.credits,
+      department_id: parseInt(data.department_id),
+      departmentName: department?.name || 'N/A',
+      created_at: new Date().toISOString(),
+      updated_at: new Date().toISOString(),
+    };
+    setCoursesList(prev => [...prev, newCourse]);
+    
+    toast({
+      title: 'Course Created (Mock)',
+      description: `Course ${data.title} has been created.`,
+    });
+    setIsSubmitting(false);
+    setIsAddCourseDialogOpen(false);
   };
 
 
@@ -96,9 +138,27 @@ export default function CourseManagementPage() {
         description="Manage academic courses, including creation, updates, and prerequisites."
         icon={BookMarked}
         action={
-          <Button>
-            <PlusCircle className="mr-2 h-4 w-4" /> Add New Course
-          </Button>
+          <Dialog open={isAddCourseDialogOpen} onOpenChange={setIsAddCourseDialogOpen}>
+            <DialogTrigger asChild>
+              <Button>
+                <PlusCircle className="mr-2 h-4 w-4" /> Add New Course
+              </Button>
+            </DialogTrigger>
+            <DialogContent className="sm:max-w-[600px]">
+              <DialogHeader>
+                <DialogTitle>Add New Course</DialogTitle>
+                <DialogDescription>
+                  Fill in the details to create a new academic course.
+                </DialogDescription>
+              </DialogHeader>
+              <AddCourseForm
+                onSubmit={handleAddNewCourse}
+                onCancel={() => setIsAddCourseDialogOpen(false)}
+                departments={mockDepartments}
+                isSubmitting={isSubmitting}
+              />
+            </DialogContent>
+          </Dialog>
         }
       />
       
@@ -186,7 +246,6 @@ export default function CourseManagementPage() {
         </Table>
       </Card>
 
-      {/* Basic Pagination - can be replaced with the ShadCN component if preferred */}
       {totalPages > 1 && (
         <div className="flex justify-center mt-4 space-x-2">
           <Button
