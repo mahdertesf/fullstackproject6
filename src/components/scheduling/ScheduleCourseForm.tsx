@@ -18,6 +18,7 @@ import { ScheduleCourseSchema, type ScheduleCourseFormData } from '@/lib/schemas
 import type { Course, Semester, Teacher, Room } from '@/types';
 import { Loader2 } from 'lucide-react';
 import { ScrollArea } from '@/components/ui/scroll-area';
+import { useEffect } from 'react';
 
 interface ScheduleCourseFormProps {
   onSubmit: (data: ScheduleCourseFormData) => Promise<void>;
@@ -27,6 +28,8 @@ interface ScheduleCourseFormProps {
   semesters: Semester[];
   teachers: Teacher[];
   rooms: Room[];
+  initialData?: Partial<ScheduleCourseFormData>;
+  submitButtonText?: string;
 }
 
 const NO_ROOM_VALUE = "none"; // Special value for no room selection
@@ -39,14 +42,16 @@ export default function ScheduleCourseForm({
   semesters,
   teachers,
   rooms,
+  initialData,
+  submitButtonText = "Schedule Course",
 }: ScheduleCourseFormProps) {
   const form = useForm<ScheduleCourseFormData>({
     resolver: zodResolver(ScheduleCourseSchema),
-    defaultValues: {
+    defaultValues: initialData || {
       course_id: undefined,
       semester_id: undefined,
       teacher_id: undefined,
-      room_id: '', // Default to empty string, placeholder will show
+      room_id: '', 
       section_number: '',
       max_capacity: 50,
       days_of_week: '',
@@ -54,6 +59,12 @@ export default function ScheduleCourseForm({
       end_time: '',
     },
   });
+
+  useEffect(() => {
+    if (initialData) {
+      form.reset(initialData);
+    }
+  }, [initialData, form]);
 
   const handleSubmit = async (data: ScheduleCourseFormData) => {
     await onSubmit(data);
@@ -70,7 +81,7 @@ export default function ScheduleCourseForm({
               render={({ field }) => (
                 <FormItem>
                   <FormLabel>Course</FormLabel>
-                  <Select onValueChange={field.onChange} defaultValue={field.value}>
+                  <Select onValueChange={field.onChange} value={field.value || ''}>
                     <FormControl>
                       <SelectTrigger>
                         <SelectValue placeholder="Select a course" />
@@ -96,7 +107,7 @@ export default function ScheduleCourseForm({
                 render={({ field }) => (
                   <FormItem>
                     <FormLabel>Semester</FormLabel>
-                    <Select onValueChange={field.onChange} defaultValue={field.value}>
+                    <Select onValueChange={field.onChange} value={field.value || ''}>
                       <FormControl>
                         <SelectTrigger>
                           <SelectValue placeholder="Select a semester" />
@@ -120,7 +131,7 @@ export default function ScheduleCourseForm({
                 render={({ field }) => (
                   <FormItem>
                     <FormLabel>Teacher</FormLabel>
-                    <Select onValueChange={field.onChange} defaultValue={field.value}>
+                    <Select onValueChange={field.onChange} value={field.value || ''}>
                       <FormControl>
                         <SelectTrigger>
                           <SelectValue placeholder="Select a teacher" />
@@ -147,7 +158,7 @@ export default function ScheduleCourseForm({
                 render={({ field }) => (
                     <FormItem>
                     <FormLabel>Room (Optional)</FormLabel>
-                    <Select onValueChange={field.onChange} value={field.value || ''}> {/* Ensure value is controlled and defaults to empty string for placeholder */}
+                    <Select onValueChange={field.onChange} value={field.value || ''}> 
                         <FormControl>
                         <SelectTrigger>
                             <SelectValue placeholder="Select a room" />
@@ -188,7 +199,9 @@ export default function ScheduleCourseForm({
                 <FormItem>
                   <FormLabel>Max Capacity</FormLabel>
                   <FormControl>
-                    <Input type="number" placeholder="50" {...field} />
+                    <Input type="number" placeholder="50" {...field} 
+                      onChange={e => field.onChange(parseInt(e.target.value, 10) || 0)} 
+                    />
                   </FormControl>
                   <FormMessage />
                 </FormItem>
@@ -245,7 +258,7 @@ export default function ScheduleCourseForm({
           </Button>
           <Button type="submit" disabled={isSubmitting}>
             {isSubmitting ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : null}
-            Schedule Course
+            {submitButtonText}
           </Button>
         </div>
       </form>

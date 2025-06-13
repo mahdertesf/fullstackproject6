@@ -14,7 +14,7 @@ import { Edit3, ShieldAlert, PlusCircle, MoreHorizontal, Edit, Trash2, Loader2 }
 import { mockScheduledCourses, mockCourses, mockTeachers, mockSemesters, mockRooms, mockBuildings } from '@/lib/data';
 import type { ScheduledCourse, Course, Teacher, Semester, Room, Building } from '@/types';
 import { useToast } from '@/hooks/use-toast';
-import { format } from 'date-fns';
+import { format, parse } from 'date-fns';
 import ScheduleCourseForm from '@/components/scheduling/ScheduleCourseForm';
 import type { ScheduleCourseFormData } from '@/lib/schemas';
 
@@ -28,7 +28,31 @@ interface EnrichedScheduledCourse extends ScheduledCourse {
 }
 
 const ITEMS_PER_PAGE = 10;
-const NO_ROOM_VALUE = "none"; // Consistent with ScheduleCourseForm
+const NO_ROOM_VALUE = "none"; 
+
+// Helper function to format time to HH:MM, which the input type="time" expects
+const formatTimeToHHMM = (timeString: string | null | undefined): string => {
+  if (!timeString) return '';
+  // Check if already HH:MM
+  if (timeString.match(/^\d{2}:\d{2}$/)) return timeString;
+  // Check for HH:MM:SS
+  if (timeString.match(/^\d{2}:\d{2}:\d{2}$/)) return timeString.substring(0,5);
+  
+  // Attempt to parse common formats like 'hh:mm a' or Date object
+  try {
+    // Use a dummy date for parsing if it's not a full date string
+    const date = parse(timeString, 'hh:mm a', new Date());
+    if (!isNaN(date.getTime())) {
+      return format(date, 'HH:mm');
+    }
+  } catch (e) {
+    // ignore parsing error
+  }
+  
+  // Fallback for unhandled or already correct formats
+  return timeString.split(' ')[0]; // Attempt to remove AM/PM if present and no other format matches
+};
+
 
 export default function ScheduleCoursesPage() {
   const { user } = useAuthStore();
@@ -100,7 +124,7 @@ export default function ScheduleCoursesPage() {
   const handleAddScheduledCourseSubmit = async (data: ScheduleCourseFormData) => {
     setIsSubmittingDialog(true);
     console.log("New scheduled course data:", data);
-    await new Promise(resolve => setTimeout(resolve, 1000)); // Simulate API call
+    await new Promise(resolve => setTimeout(resolve, 1000)); 
 
     const newScheduledCourseId = Math.max(...scheduledCoursesList.map(sc => sc.scheduled_course_id), 0) + 1;
     
@@ -117,7 +141,7 @@ export default function ScheduleCoursesPage() {
         room_id: finalRoomId,
         section_number: data.section_number,
         max_capacity: data.max_capacity,
-        current_enrollment: 0, // New courses start with 0 enrollment
+        current_enrollment: 0, 
         days_of_week: data.days_of_week,
         start_time: data.start_time,
         end_time: data.end_time,
@@ -132,27 +156,51 @@ export default function ScheduleCoursesPage() {
     setIsAddDialogOpen(false);
   };
 
-  const handleEditDialogSubmit = async () => { // Placeholder for edit submit
+  const handleEditScheduledCourseSubmit = async (data: ScheduleCourseFormData) => {
+    if (!selectedScheduledCourse) return;
     setIsSubmittingDialog(true);
+    console.log("Editing scheduled course data:", selectedScheduledCourse.scheduled_course_id, data);
     await new Promise(resolve => setTimeout(resolve, 1000));
-    if (selectedScheduledCourse) {
-      toast({ title: 'Changes Saved (Mock)', description: `Changes for ${selectedScheduledCourse.courseName} have been notionally saved.` });
+
+    let finalRoomId: number | null = null;
+    if (data.room_id && data.room_id !== NO_ROOM_VALUE) {
+        finalRoomId = parseInt(data.room_id);
     }
+
+    setScheduledCoursesList(prevList =>
+      prevList.map(sc =>
+        sc.scheduled_course_id === selectedScheduledCourse.scheduled_course_id
+          ? {
+              ...sc,
+              course_id: parseInt(data.course_id),
+              semester_id: parseInt(data.semester_id),
+              teacher_id: parseInt(data.teacher_id),
+              room_id: finalRoomId,
+              section_number: data.section_number,
+              max_capacity: data.max_capacity,
+              days_of_week: data.days_of_week,
+              start_time: data.start_time,
+              end_time: data.end_time,
+              updated_at: new Date().toISOString(),
+            }
+          : sc
+      )
+    );
+    
+    toast({ title: 'Scheduled Course Updated (Mock)', description: `Schedule for ${selectedScheduledCourse.courseName} has been updated.` });
     setIsSubmittingDialog(false);
     setIsEditDialogOpen(false);
     setSelectedScheduledCourse(null);
   };
 
 
-  const formatTime = (timeString: string | null | undefined) => {
+  const formatDisplayTime = (timeString: string | null | undefined) => {
     if (!timeString) return 'N/A';
-    // Check if timeString is already in hh:mm a format from previous processing or if it's HH:mm or HH:mm:ss
     if (timeString.match(/(\d{1,2}:\d{2}\s*(AM|PM))/i)) return timeString;
 
     const [hours, minutes] = timeString.split(':');
     if (isNaN(parseInt(hours)) || isNaN(parseInt(minutes))) return 'Invalid Time';
     
-    // Create a date object just to use formatting. Date part is irrelevant.
     const date = new Date(2000, 0, 1, parseInt(hours), parseInt(minutes));
     return format(date, 'hh:mm a');
   };
@@ -167,6 +215,19 @@ export default function ScheduleCoursesPage() {
       </div>
     );
   }
+  
+  const editInitialData: ScheduleCourseFormData | undefined = selectedScheduledCourse ? {
+    course_id: String(selectedScheduledCourse.course_id),
+    semester_id: String(selectedScheduledCourse.semester_id),
+    teacher_id: String(selectedScheduledCourse.teacher_id),
+    room_id: selectedScheduledCourse.room_id ? String(selectedScheduledCourse.room_id) : NO_ROOM_VALUE,
+    section_number: selectedScheduledCourse.section_number,
+    max_capacity: selectedScheduledCourse.max_capacity,
+    days_of_week: selectedScheduledCourse.days_of_week || '',
+    start_time: formatTimeToHHMM(selectedScheduledCourse.start_time),
+    end_time: formatTimeToHHMM(selectedScheduledCourse.end_time),
+  } : undefined;
+
 
   return (
     <div className="space-y-6">
@@ -196,6 +257,7 @@ export default function ScheduleCoursesPage() {
                 semesters={mockSemesters}
                 teachers={mockTeachers}
                 rooms={mockRooms}
+                submitButtonText="Schedule Course"
               />
             </DialogContent>
           </Dialog>
@@ -232,7 +294,7 @@ export default function ScheduleCoursesPage() {
                     <TableCell>{sc.semesterName}</TableCell>
                     <TableCell>{sc.section_number}</TableCell>
                     <TableCell>
-                        {sc.days_of_week ? `${sc.days_of_week}, ${formatTime(sc.start_time)} - ${formatTime(sc.end_time)}` : 'N/A'}
+                        {sc.days_of_week ? `${sc.days_of_week}, ${formatDisplayTime(sc.start_time)} - ${formatDisplayTime(sc.end_time)}` : 'N/A'}
                     </TableCell>
                     <TableCell>
                         {sc.buildingName || 'N/A'}, {sc.roomNumber || 'N/A'}
@@ -297,26 +359,26 @@ export default function ScheduleCoursesPage() {
           setIsEditDialogOpen(isOpen);
           if (!isOpen) setSelectedScheduledCourse(null);
         }}>
-          <DialogContent className="sm:max-w-2xl"> {/* Increased width for potential edit form */}
+          <DialogContent className="sm:max-w-2xl">
             <DialogHeader>
               <DialogTitle>Edit Scheduled Course: {selectedScheduledCourse.courseCode} - {selectedScheduledCourse.courseName}</DialogTitle>
               <DialogDescription>
-                The form to edit this scheduled course (ID: {selectedScheduledCourse.scheduled_course_id}) will be implemented here.
+                Modify the details for this scheduled course.
               </DialogDescription>
             </DialogHeader>
-            {/* Placeholder for EditScheduleForm - Replace with actual form component when ready */}
-            <div className="py-8 text-center text-muted-foreground">
-              (Edit Schedule Form will appear here)
-            </div>
-            <DialogFooter>
-              <Button variant="outline" onClick={() => { setIsEditDialogOpen(false); setSelectedScheduledCourse(null); }} disabled={isSubmittingDialog}>
-                Cancel
-              </Button>
-              <Button onClick={handleEditDialogSubmit} disabled={isSubmittingDialog}>
-                {isSubmittingDialog && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
-                Save Changes (Mock)
-              </Button>
-            </DialogFooter>
+            {editInitialData && (
+              <ScheduleCourseForm
+                onSubmit={handleEditScheduledCourseSubmit}
+                onCancel={() => { setIsEditDialogOpen(false); setSelectedScheduledCourse(null); }}
+                isSubmitting={isSubmittingDialog}
+                courses={mockCourses}
+                semesters={mockSemesters}
+                teachers={mockTeachers}
+                rooms={mockRooms}
+                initialData={editInitialData}
+                submitButtonText="Save Changes"
+              />
+            )}
           </DialogContent>
         </Dialog>
       )}
