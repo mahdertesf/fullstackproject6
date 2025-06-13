@@ -135,3 +135,11 @@ export const BuildingFormDataSchema = z.object({
   address: z.string().max(255, "Address must be 255 characters or less.").optional(),
 });
 export type BuildingFormData = z.infer<typeof BuildingFormDataSchema>;
+
+export const RoomFormDataSchema = z.object({
+  building_id: z.string().min(1, { message: "Building is required." }),
+  room_number: z.string().min(1, "Room number is required.").max(20, "Room number cannot exceed 20 characters."),
+  capacity: z.coerce.number().int().min(1, "Capacity must be at least 1.").max(1000, "Capacity seems too high."),
+  type: z.string().max(50, "Type must be 50 characters or less.").optional(),
+});
+export type RoomFormData = z.infer<typeof RoomFormDataSchema>;
