@@ -8,6 +8,7 @@ import { Input } from '@/components/ui/input';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from '@/components/ui/dropdown-menu';
+import { Card } from '@/components/ui/card'; // Added Card import
 import { mockUserProfiles } from '@/lib/data';
 import type { UserProfile, UserRole } from '@/types';
 import { Users, Edit, Trash2, PlusCircle, Search, Filter, MoreHorizontal, ShieldAlert } from 'lucide-react';
@@ -209,3 +210,4 @@ export default function UserManagementPage() {
     </div>
   );
 }
+
