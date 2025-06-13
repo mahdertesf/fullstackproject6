@@ -1,5 +1,5 @@
 
-import type { User, Department, Course, Student, Teacher, Staff, Semester, Announcement, ScheduledCourse, Registration, CourseMaterial, Assessment, UserProfile, Building, Room, Prerequisite } from '@/types';
+import type { User, Department, Course, Student, Teacher, Staff, Semester, Announcement, ScheduledCourse, Registration, CourseMaterial, Assessment, UserProfile, Building, Room, Prerequisite, AuditLog } from '@/types';
 
 export const mockUsers: User[] = [
   { user_id: 1, username: 'admin', password_hash: 'hashed_password', email: 'admin@cotbe.edu', role: 'Staff', is_active: true, created_at: new Date().toISOString(), updated_at: new Date().toISOString() },
@@ -95,4 +95,86 @@ export const mockAssessments: Assessment[] = [
     { assessment_id: 2, scheduled_course_id: 1, name: 'Midterm Exam', description: 'Covers first half of the course', max_score: 100, due_date: new Date(Date.now() + 30 * 24 * 60 * 60 * 1000).toISOString(), type: 'Exam', created_at: new Date().toISOString(), updated_at: new Date().toISOString(), scheduledCourse: mockScheduledCourses[0] },
 ];
 
+export const mockAuditLogs: AuditLog[] = [
+  {
+    log_id: 1,
+    user_id: 1, // admin
+    action_type: 'USER_LOGIN',
+    timestamp: new Date(Date.now() - 2 * 60 * 60 * 1000).toISOString(), // 2 hours ago
+    ip_address: '192.168.1.10',
+    details: 'User admin logged in successfully.',
+    user: mockUserProfiles.find(u => u.user_id === 1)
+  },
+  {
+    log_id: 2,
+    user_id: 2, // staff1
+    action_type: 'COURSE_CREATED',
+    target_entity_type: 'Course',
+    target_entity_id: 'CS101',
+    timestamp: new Date(Date.now() - 5 * 60 * 60 * 1000).toISOString(), // 5 hours ago
+    ip_address: '203.0.113.45',
+    details: 'Course "Introduction to Computer Science" (CS101) created.',
+    user: mockUserProfiles.find(u => u.user_id === 2)
+  },
+  {
+    log_id: 3,
+    user_id: 1, // admin
+    action_type: 'USER_UPDATED',
+    target_entity_type: 'User',
+    target_entity_id: '4', // student1
+    timestamp: new Date(Date.now() - 24 * 60 * 60 * 1000).toISOString(), // 1 day ago
+    ip_address: '192.168.1.10',
+    details: 'Profile for user student1 (ID: 4) updated. Email changed.',
+    user: mockUserProfiles.find(u => u.user_id === 1)
+  },
+  {
+    log_id: 4,
+    user_id: null, // System action
+    action_type: 'SYSTEM_BACKUP',
+    timestamp: new Date(Date.now() - 2 * 24 * 60 * 60 * 1000).toISOString(), // 2 days ago
+    details: 'Automated system backup completed successfully.',
+  },
+  {
+    log_id: 5,
+    user_id: 3, // teacher1
+    action_type: 'ANNOUNCEMENT_POSTED',
+    target_entity_type: 'Announcement',
+    target_entity_id: 'ANN003',
+    timestamp: new Date(Date.now() - 30 * 60 * 1000).toISOString(), // 30 minutes ago
+    ip_address: '198.51.100.2',
+    details: 'Teacher teacher1 posted announcement "Midterm Grades Available".',
+    user: mockUserProfiles.find(u => u.user_id === 3)
+  },
+   {
+    log_id: 6,
+    user_id: 1,
+    action_type: 'DEPARTMENT_DELETED',
+    target_entity_type: 'Department',
+    target_entity_id: 'ARCH',
+    timestamp: new Date(Date.now() - 3 * 24 * 60 * 60 * 1000).toISOString(),
+    ip_address: '192.168.1.12',
+    details: 'Department "Architecture" (ARCH) was deleted.',
+    user: mockUserProfiles.find(u => u.user_id === 1)
+  },
+  {
+    log_id: 7,
+    user_id: 4, // student1
+    action_type: 'COURSE_REGISTRATION',
+    target_entity_type: 'Course',
+    target_entity_id: 'SE450',
+    timestamp: new Date(Date.now() - 1 * 60 * 60 * 1000).toISOString(),
+    ip_address: '172.16.0.5',
+    details: 'Student student1 registered for course "Web Development" (SE450).',
+    user: mockUserProfiles.find(u => u.user_id === 4)
+  },
+  {
+    log_id: 8,
+    user_id: 2, // staff1
+    action_type: 'USER_LOGIN_FAILED',
+    timestamp: new Date(Date.now() - 10 * 60 * 1000).toISOString(), // 10 minutes ago
+    ip_address: '203.0.113.45',
+    details: 'Failed login attempt for username: staff1_typo.',
+    user: mockUserProfiles.find(u => u.user_id === 2) // Or null if user is not identified by username
+  },
+];
     
