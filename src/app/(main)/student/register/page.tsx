@@ -9,10 +9,10 @@ import {
   mockScheduledCourses, 
   mockCourses, 
   mockSemesters, 
-  mockRegistrations,
+  mockRegistrations, // Imported mock data array for registrations
   mockUserProfiles,
   mockPrerequisites
-} from '@/lib/data';
+} from '@/lib/data'; // All data sourced from mock data files
 import type { UserProfile, ScheduledCourse, Course, Semester, Registration } from '@/types';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle, CardFooter } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
@@ -68,6 +68,7 @@ export default function StudentCourseRegistrationPage() {
 
 
   useEffect(() => {
+    // All data sources for course listing and checks are from mock data
     if (user && user.role === 'Student' && selectedSemesterId && selectedSemester) {
       setIsLoading(true);
       const studentUser = user as UserProfile;
@@ -88,7 +89,6 @@ export default function StudentCourseRegistrationPage() {
         .map(sc => {
           const courseDetails = mockCourses.find(c => c.course_id === sc.course_id);
           
-          // Department check: Student must be in the course's department or course has no specific department
           if (studentUser.department_id && courseDetails?.department_id && courseDetails.department_id !== studentUser.department_id) {
             return null; 
           }
@@ -137,11 +137,15 @@ export default function StudentCourseRegistrationPage() {
 
   const handleRegister = (scheduledCourseId: number) => {
     if (!user || !selectedSemesterId || !selectedSemester) return;
+    
+    // This function directly modifies the imported mockRegistrations and mockScheduledCourses arrays.
     console.log("Attempting mock registration...");
     const studentUser = user as UserProfile;
     const courseToRegister = availableCourses.find(c => c.scheduled_course_id === scheduledCourseId);
 
     if (courseToRegister && courseToRegister.canRegister) {
+      // MOCK ACTION: Directly modify mockRegistrations and mockScheduledCourses from src/lib/data.ts
+      console.log("Registering for course (mock):", scheduledCourseId, "for student:", studentUser.user_id);
       const newRegistrationId = Math.max(0, ...mockRegistrations.map(r => r.registration_id)) + 1;
       const newReg: Registration = {
         registration_id: newRegistrationId,
@@ -154,8 +158,7 @@ export default function StudentCourseRegistrationPage() {
         student: studentUser,
       };
       
-      console.log("Adding to mockRegistrations:", newReg);
-      mockRegistrations.push(newReg);
+      mockRegistrations.push(newReg); // Modifying imported mock array
 
       setAvailableCourses(prev => prev.map(c => 
         c.scheduled_course_id === scheduledCourseId ? { ...c, isRegistered: true, canRegister: false, current_enrollment: c.current_enrollment + 1, canDrop: new Date(selectedSemester!.add_drop_end_date) >= now && new Date(selectedSemester!.add_drop_start_date) <= now } : c
@@ -164,9 +167,7 @@ export default function StudentCourseRegistrationPage() {
       
       const scIndex = mockScheduledCourses.findIndex(sc => sc.scheduled_course_id === scheduledCourseId);
       if (scIndex > -1) {
-        console.log(`Updating mockScheduledCourses enrollment for ID ${scheduledCourseId}. Old: ${mockScheduledCourses[scIndex].current_enrollment}`);
-        mockScheduledCourses[scIndex].current_enrollment +=1;
-        console.log(`New enrollment: ${mockScheduledCourses[scIndex].current_enrollment}`);
+        mockScheduledCourses[scIndex].current_enrollment +=1; // Modifying imported mock array
       }
 
       toast({ title: 'Registration Successful (Mock)', description: `You have been registered for ${courseToRegister.courseDetails?.title}.` });
@@ -182,16 +183,19 @@ export default function StudentCourseRegistrationPage() {
   
   const handleDrop = (scheduledCourseId: number) => {
      if (!user || !selectedSemester || !selectedSemesterId) return;
+      
+      // This function directly modifies the imported mockRegistrations and mockScheduledCourses arrays.
       console.log("Attempting mock drop...");
       const studentUser = user as UserProfile;
       const regToDrop = studentRegistrations.find(r => r.scheduled_course_id === scheduledCourseId);
       const courseToUpdate = availableCourses.find(c => c.scheduled_course_id === scheduledCourseId);
 
       if (regToDrop && courseToUpdate?.canDrop) {
+        // MOCK ACTION: Directly modify mockRegistrations and mockScheduledCourses from src/lib/data.ts
+        console.log("Dropping course (mock):", scheduledCourseId, "for student:", studentUser.user_id);
         const regIndex = mockRegistrations.findIndex(r => r.registration_id === regToDrop.registration_id);
         if (regIndex > -1) {
-            console.log("Removing from mockRegistrations:", mockRegistrations[regIndex]);
-            mockRegistrations.splice(regIndex, 1); 
+            mockRegistrations.splice(regIndex, 1);  // Modifying imported mock array
         }
 
         setStudentRegistrations(prev => prev.filter(r => r.registration_id !== regToDrop.registration_id));
@@ -207,9 +211,7 @@ export default function StudentCourseRegistrationPage() {
 
         const scIndex = mockScheduledCourses.findIndex(sc => sc.scheduled_course_id === scheduledCourseId);
         if (scIndex > -1) {
-            console.log(`Updating mockScheduledCourses enrollment for ID ${scheduledCourseId}. Old: ${mockScheduledCourses[scIndex].current_enrollment}`);
-            mockScheduledCourses[scIndex].current_enrollment = Math.max(0, mockScheduledCourses[scIndex].current_enrollment -1);
-            console.log(`New enrollment: ${mockScheduledCourses[scIndex].current_enrollment}`);
+            mockScheduledCourses[scIndex].current_enrollment = Math.max(0, mockScheduledCourses[scIndex].current_enrollment -1); // Modifying imported mock array
         }
         toast({ title: 'Course Dropped (Mock)', description: `You have dropped ${courseToUpdate?.courseDetails?.title}.` });
       } else {
@@ -234,7 +236,7 @@ export default function StudentCourseRegistrationPage() {
     <div className="space-y-6">
       <PageHeader 
         title="Course Registration"
-        description="Browse and register for available courses."
+        description="Browse and register for available courses. All actions directly use mock data."
         icon={Edit3}
       />
 
