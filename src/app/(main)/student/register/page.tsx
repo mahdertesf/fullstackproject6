@@ -88,9 +88,9 @@ export default function StudentCourseRegistrationPage() {
         .map(sc => {
           const courseDetails = mockCourses.find(c => c.course_id === sc.course_id);
           
-          // Department check
-          if (studentUser.department_id && courseDetails?.department_id !== studentUser.department_id) {
-            return null; // Student not in the course's department
+          // Department check: Student must be in the course's department or course has no specific department
+          if (studentUser.department_id && courseDetails?.department_id && courseDetails.department_id !== studentUser.department_id) {
+            return null; 
           }
 
           const teacherDetails = mockUserProfiles.find(t => t.user_id === sc.teacher_id);
@@ -121,7 +121,7 @@ export default function StudentCourseRegistrationPage() {
             canRegister,
             canDrop,
           };
-        }).filter(Boolean) as AvailableCourseForRegistration[]; // filter(Boolean) removes nulls
+        }).filter(Boolean) as AvailableCourseForRegistration[]; 
       
       setAvailableCourses(coursesForSemester);
       setIsLoading(false);
@@ -130,13 +130,14 @@ export default function StudentCourseRegistrationPage() {
     } else if (user && user.role !== 'Student') {
       router.replace('/dashboard');
     } else if (!selectedSemesterId || !selectedSemester) {
-      setAvailableCourses([]); // Clear courses if no semester selected
+      setAvailableCourses([]); 
       setIsLoading(false);
     }
   }, [user, router, selectedSemesterId, selectedSemester, now]);
 
   const handleRegister = (scheduledCourseId: number) => {
     if (!user || !selectedSemesterId || !selectedSemester) return;
+    console.log("Attempting mock registration...");
     const studentUser = user as UserProfile;
     const courseToRegister = availableCourses.find(c => c.scheduled_course_id === scheduledCourseId);
 
@@ -152,6 +153,8 @@ export default function StudentCourseRegistrationPage() {
         scheduledCourse: mockScheduledCourses.find(sc => sc.scheduled_course_id === scheduledCourseId),
         student: studentUser,
       };
+      
+      console.log("Adding to mockRegistrations:", newReg);
       mockRegistrations.push(newReg);
 
       setAvailableCourses(prev => prev.map(c => 
@@ -161,17 +164,25 @@ export default function StudentCourseRegistrationPage() {
       
       const scIndex = mockScheduledCourses.findIndex(sc => sc.scheduled_course_id === scheduledCourseId);
       if (scIndex > -1) {
+        console.log(`Updating mockScheduledCourses enrollment for ID ${scheduledCourseId}. Old: ${mockScheduledCourses[scIndex].current_enrollment}`);
         mockScheduledCourses[scIndex].current_enrollment +=1;
+        console.log(`New enrollment: ${mockScheduledCourses[scIndex].current_enrollment}`);
       }
 
       toast({ title: 'Registration Successful (Mock)', description: `You have been registered for ${courseToRegister.courseDetails?.title}.` });
     } else {
-      toast({ variant: 'destructive', title: 'Registration Failed', description: 'Cannot register for this course. It might be full, prerequisites not met, or registration deadline passed.' });
+      let reason = "Cannot register for this course.";
+      if (!courseToRegister?.prerequisitesMet) reason = "Prerequisites not met.";
+      else if (courseToRegister && courseToRegister.current_enrollment >= courseToRegister.max_capacity) reason = "Course section is full.";
+      else if (selectedSemester && !(new Date(selectedSemester.registration_start_date) <= now && new Date(selectedSemester.registration_end_date) >= now)) reason = "Registration period is closed.";
+      
+      toast({ variant: 'destructive', title: 'Registration Failed', description: reason });
     }
   };
   
   const handleDrop = (scheduledCourseId: number) => {
      if (!user || !selectedSemester || !selectedSemesterId) return;
+      console.log("Attempting mock drop...");
       const studentUser = user as UserProfile;
       const regToDrop = studentRegistrations.find(r => r.scheduled_course_id === scheduledCourseId);
       const courseToUpdate = availableCourses.find(c => c.scheduled_course_id === scheduledCourseId);
@@ -179,6 +190,7 @@ export default function StudentCourseRegistrationPage() {
       if (regToDrop && courseToUpdate?.canDrop) {
         const regIndex = mockRegistrations.findIndex(r => r.registration_id === regToDrop.registration_id);
         if (regIndex > -1) {
+            console.log("Removing from mockRegistrations:", mockRegistrations[regIndex]);
             mockRegistrations.splice(regIndex, 1); 
         }
 
@@ -195,11 +207,15 @@ export default function StudentCourseRegistrationPage() {
 
         const scIndex = mockScheduledCourses.findIndex(sc => sc.scheduled_course_id === scheduledCourseId);
         if (scIndex > -1) {
+            console.log(`Updating mockScheduledCourses enrollment for ID ${scheduledCourseId}. Old: ${mockScheduledCourses[scIndex].current_enrollment}`);
             mockScheduledCourses[scIndex].current_enrollment = Math.max(0, mockScheduledCourses[scIndex].current_enrollment -1);
+            console.log(`New enrollment: ${mockScheduledCourses[scIndex].current_enrollment}`);
         }
         toast({ title: 'Course Dropped (Mock)', description: `You have dropped ${courseToUpdate?.courseDetails?.title}.` });
       } else {
-        toast({ variant: 'destructive', title: 'Drop Failed', description: 'Cannot drop this course. Add/Drop period may have ended.' });
+        let reason = "Cannot drop this course.";
+        if (selectedSemester && !(new Date(selectedSemester.add_drop_start_date) <= now && new Date(selectedSemester.add_drop_end_date) >= now)) reason = "Add/Drop period has ended.";
+        toast({ variant: 'destructive', title: 'Drop Failed', description: reason });
       }
   };
 
@@ -317,3 +333,4 @@ export default function StudentCourseRegistrationPage() {
     </div>
   );
 }
+
