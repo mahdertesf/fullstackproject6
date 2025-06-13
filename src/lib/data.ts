@@ -1,5 +1,5 @@
 
-import type { User, Department, Course, Student, Teacher, Staff, Semester, Announcement, ScheduledCourse, Registration, CourseMaterial, Assessment, UserProfile } from '@/types';
+import type { User, Department, Course, Student, Teacher, Staff, Semester, Announcement, ScheduledCourse, Registration, CourseMaterial, Assessment, UserProfile, Building, Room, Prerequisite } from '@/types';
 
 export const mockUsers: User[] = [
   { user_id: 1, username: 'admin', password_hash: 'hashed_password', email: 'admin@cotbe.edu', role: 'Staff', is_active: true, created_at: new Date().toISOString(), updated_at: new Date().toISOString() },
@@ -22,6 +22,11 @@ export const mockCourses: Course[] = [
   { course_id: 3, course_code: 'EE201', title: 'Circuit Theory', description: 'Fundamentals of electrical circuits.', credits: 3, department_id: 3, created_at: new Date().toISOString(), updated_at: new Date().toISOString() },
   { course_id: 4, course_code: 'ME303', title: 'Thermodynamics', description: 'Principles of heat and energy transfer.', credits: 4, department_id: 4, created_at: new Date().toISOString(), updated_at: new Date().toISOString() },
   { course_id: 5, course_code: 'SE450', title: 'Web Development', description: 'Full-stack web application development.', credits: 3, department_id: 1, created_at: new Date().toISOString(), updated_at: new Date().toISOString() },
+];
+
+export const mockPrerequisites: Prerequisite[] = [
+  { prerequisite_id: 1, course_id: 5, prerequisite_course_id: 1 }, // SE450 requires SE301
+  { prerequisite_id: 2, course_id: 2, prerequisite_course_id: 3 }, // CE205 requires EE201 (example)
 ];
 
 export const mockStudents: Student[] = [
@@ -52,14 +57,26 @@ export const mockSemesters: Semester[] = [
   { semester_id: 2, name: 'Spring 2024', academic_year: 2024, term: 'Spring', start_date: '2024-01-15', end_date: '2024-05-10', registration_start_date: '2023-12-01T09:00:00', registration_end_date: '2023-12-20T17:00:00', add_drop_start_date: '2024-01-15T09:00:00', add_drop_end_date: '2024-01-25T17:00:00', created_at: new Date().toISOString(), updated_at: new Date().toISOString() },
 ];
 
+export const mockBuildings: Building[] = [
+  { building_id: 1, name: 'Engineering Block A', address: 'Main Campus, North Wing', created_at: new Date().toISOString(), updated_at: new Date().toISOString() },
+  { building_id: 2, name: 'Technology Hall', address: 'Main Campus, South Wing', created_at: new Date().toISOString(), updated_at: new Date().toISOString() },
+];
+
+export const mockRooms: Room[] = [
+  { room_id: 1, building_id: 1, room_number: 'A101', capacity: 60, type: 'Lecture Hall', created_at: new Date().toISOString(), updated_at: new Date().toISOString(), building: mockBuildings[0] },
+  { room_id: 2, building_id: 1, room_number: 'A102', capacity: 40, type: 'Lab', created_at: new Date().toISOString(), updated_at: new Date().toISOString(), building: mockBuildings[0] },
+  { room_id: 3, building_id: 2, room_number: 'T205', capacity: 50, type: 'Classroom', created_at: new Date().toISOString(), updated_at: new Date().toISOString(), building: mockBuildings[1] },
+];
+
+
 export const mockAnnouncements: Announcement[] = [
   { announcement_id: 1, title: 'Welcome to Fall 2023!', content: 'We are excited to welcome all new and returning students to the Fall 2023 semester.', author_id: 1, target_audience: 'All Users', desired_tone: 'Friendly', status: 'Published', publish_date: '2023-08-20T10:00:00', department_id: null, semester_id: 1, created_at: new Date().toISOString(), updated_at: new Date().toISOString() },
   { announcement_id: 2, title: 'Midterm Registration Deadline', content: 'Please be reminded that the deadline for midterm registration is approaching.', author_id: 2, target_audience: 'Students', desired_tone: 'Urgent', status: 'Published', publish_date: '2024-03-01T00:00:00', department_id: null, semester_id: 2, created_at: new Date().toISOString(), updated_at: new Date().toISOString() }
 ];
 
 export const mockScheduledCourses: ScheduledCourse[] = [
-    { scheduled_course_id: 1, course_id: 1, semester_id: 2, teacher_id: 3, room_id: 1, section_number: 'S1', max_capacity: 50, current_enrollment: 25, days_of_week: 'MWF', start_time: '09:00:00', end_time: '09:50:00', created_at: new Date().toISOString(), updated_at: new Date().toISOString(), course: mockCourses[0], semester: mockSemesters[1], teacher: mockTeachers[0] },
-    { scheduled_course_id: 2, course_id: 5, semester_id: 2, teacher_id: 3, room_id: 2, section_number: 'S1', max_capacity: 40, current_enrollment: 30, days_of_week: 'TTH', start_time: '14:00:00', end_time: '15:20:00', created_at: new Date().toISOString(), updated_at: new Date().toISOString(), course: mockCourses[4], semester: mockSemesters[1], teacher: mockTeachers[0] }
+    { scheduled_course_id: 1, course_id: 1, semester_id: 2, teacher_id: 3, room_id: 1, section_number: 'S1', max_capacity: 50, current_enrollment: 25, days_of_week: 'MWF', start_time: '09:00:00', end_time: '09:50:00', created_at: new Date().toISOString(), updated_at: new Date().toISOString(), course: mockCourses[0], semester: mockSemesters[1], teacher: mockTeachers[0], room: mockRooms[0] },
+    { scheduled_course_id: 2, course_id: 5, semester_id: 2, teacher_id: 3, room_id: 3, section_number: 'S1', max_capacity: 40, current_enrollment: 30, days_of_week: 'TTH', start_time: '14:00:00', end_time: '15:20:00', created_at: new Date().toISOString(), updated_at: new Date().toISOString(), course: mockCourses[4], semester: mockSemesters[1], teacher: mockTeachers[0], room: mockRooms[2] }
 ];
 
 export const mockRegistrations: Registration[] = [
@@ -77,3 +94,5 @@ export const mockAssessments: Assessment[] = [
     { assessment_id: 1, scheduled_course_id: 1, name: 'Homework 1', description: 'Basic Python exercises', max_score: 100, due_date: new Date(Date.now() + 7 * 24 * 60 * 60 * 1000).toISOString(), type: 'Homework', created_at: new Date().toISOString(), updated_at: new Date().toISOString(), scheduledCourse: mockScheduledCourses[0] },
     { assessment_id: 2, scheduled_course_id: 1, name: 'Midterm Exam', description: 'Covers first half of the course', max_score: 100, due_date: new Date(Date.now() + 30 * 24 * 60 * 60 * 1000).toISOString(), type: 'Exam', created_at: new Date().toISOString(), updated_at: new Date().toISOString(), scheduledCourse: mockScheduledCourses[0] },
 ];
+
+    
