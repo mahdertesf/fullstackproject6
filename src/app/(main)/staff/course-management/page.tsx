@@ -18,7 +18,8 @@ import { mockCourses, mockDepartments } from '@/lib/data';
 import type { Course, Department } from '@/types';
 import { Badge } from '@/components/ui/badge';
 import AddCourseForm from '@/components/courses/AddCourseForm';
-import { NewCourseFormData } from '@/lib/schemas';
+import EditCourseForm from '@/components/courses/EditCourseForm';
+import { NewCourseFormData, EditCourseFormData } from '@/lib/schemas';
 import { useToast } from '@/hooks/use-toast';
 
 
@@ -37,9 +38,10 @@ export default function CourseManagementPage() {
   const [selectedDepartment, setSelectedDepartment] = useState<string>('all');
   const [currentPage, setCurrentPage] = useState(1);
   const [isAddCourseDialogOpen, setIsAddCourseDialogOpen] = useState(false);
+  const [isEditCourseDialogOpen, setIsEditCourseDialogOpen] = useState(false);
+  const [editingCourse, setEditingCourse] = useState<CourseWithDepartmentName | null>(null);
   const [isSubmitting, setIsSubmitting] = useState(false);
   
-  // Initialize coursesList with mock data enhanced with department names
   const initialCoursesWithDept = useMemo(() => {
     return mockCourses.map(course => ({
       ...course,
@@ -81,14 +83,51 @@ export default function CourseManagementPage() {
     }
   };
 
-  const handleEditCourse = (courseId: number) => {
-    console.log(`Edit course: ${courseId}`);
-    toast({ title: 'Edit Course (Not Implemented)', description: `Functionality to edit course ${courseId} is not yet fully implemented.` });
+  const handleOpenEditDialog = (courseToEdit: CourseWithDepartmentName) => {
+    setEditingCourse(courseToEdit);
+    setIsEditCourseDialogOpen(true);
+  };
+
+  const handleEditCourseSubmit = async (data: EditCourseFormData) => {
+    if (!editingCourse) return;
+    setIsSubmitting(true);
+    console.log("Editing course data:", editingCourse.course_id, data);
+    
+    await new Promise(resolve => setTimeout(resolve, 1000)); // Simulate API call
+
+    const department = mockDepartments.find(d => d.department_id === parseInt(data.department_id));
+
+    setCoursesList(prev => 
+      prev.map(c => 
+        c.course_id === editingCourse.course_id 
+          ? { 
+              ...c, 
+              course_code: data.course_code,
+              title: data.title,
+              description: data.description || null,
+              credits: data.credits,
+              department_id: parseInt(data.department_id),
+              departmentName: department?.name || 'N/A',
+              updated_at: new Date().toISOString(),
+            } 
+          : c
+      )
+    );
+    
+    toast({
+      title: 'Course Updated (Mock)',
+      description: `Course ${data.title} has been updated.`,
+    });
+    setIsSubmitting(false);
+    setIsEditCourseDialogOpen(false);
+    setEditingCourse(null);
   };
 
   const handleDeleteCourse = (courseId: number) => {
-    console.log(`Delete course: ${courseId}`);
-    toast({ title: 'Delete Course (Not Implemented)', description: `Functionality to delete course ${courseId} is not yet fully implemented.` });
+    console.log(`Delete course (Mock): ${courseId}`);
+    // Mock deletion:
+    // setCoursesList(prev => prev.filter(c => c.course_id !== courseId));
+    toast({ title: 'Delete Course (Not Implemented)', description: `Functionality to delete course ${courseId} is not yet fully implemented. Mocked.` });
   };
 
   const handleAddNewCourse = async (data: NewCourseFormData) => {
@@ -110,7 +149,7 @@ export default function CourseManagementPage() {
       created_at: new Date().toISOString(),
       updated_at: new Date().toISOString(),
     };
-    setCoursesList(prev => [...prev, newCourse]);
+    setCoursesList(prev => [newCourse, ...prev]); // Add to the beginning of the list for visibility
     
     toast({
       title: 'Course Created (Mock)',
@@ -224,7 +263,7 @@ export default function CourseManagementPage() {
                         </Button>
                       </DropdownMenuTrigger>
                       <DropdownMenuContent align="end">
-                        <DropdownMenuItem onClick={() => handleEditCourse(course.course_id)}>
+                        <DropdownMenuItem onClick={() => handleOpenEditDialog(course)}>
                           <Edit className="mr-2 h-4 w-4" /> Edit
                         </DropdownMenuItem>
                         <DropdownMenuItem onClick={() => handleDeleteCourse(course.course_id)} className="text-destructive focus:text-destructive focus:bg-destructive/10">
@@ -266,6 +305,29 @@ export default function CourseManagementPage() {
             Next
           </Button>
         </div>
+      )}
+
+      {editingCourse && (
+        <Dialog open={isEditCourseDialogOpen} onOpenChange={(isOpen) => {
+          setIsEditCourseDialogOpen(isOpen);
+          if (!isOpen) setEditingCourse(null);
+        }}>
+          <DialogContent className="sm:max-w-[600px]">
+            <DialogHeader>
+              <DialogTitle>Edit Course: {editingCourse.title}</DialogTitle>
+              <DialogDescription>
+                Modify the course details below.
+              </DialogDescription>
+            </DialogHeader>
+            <EditCourseForm
+              courseToEdit={editingCourse}
+              onSubmit={handleEditCourseSubmit}
+              onCancel={() => { setIsEditCourseDialogOpen(false); setEditingCourse(null); }}
+              departments={mockDepartments}
+              isSubmitting={isSubmitting}
+            />
+          </DialogContent>
+        </Dialog>
       )}
     </div>
   );
