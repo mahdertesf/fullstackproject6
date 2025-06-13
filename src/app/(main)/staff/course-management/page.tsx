@@ -19,7 +19,7 @@ import type { Course, Department } from '@/types';
 import { Badge } from '@/components/ui/badge';
 import AddCourseForm from '@/components/courses/AddCourseForm';
 import EditCourseForm from '@/components/courses/EditCourseForm';
-import { NewCourseFormData, EditCourseFormData } from '@/lib/schemas';
+import { NewCourseSchema, type NewCourseFormData, EditCourseSchema, type EditCourseFormData } from '@/lib/schemas';
 import { useToast } from '@/hooks/use-toast';
 
 
@@ -124,10 +124,12 @@ export default function CourseManagementPage() {
   };
 
   const handleDeleteCourse = (courseId: number) => {
-    console.log(`Delete course (Mock): ${courseId}`);
-    // Mock deletion:
-    // setCoursesList(prev => prev.filter(c => c.course_id !== courseId));
-    toast({ title: 'Delete Course (Not Implemented)', description: `Functionality to delete course ${courseId} is not yet fully implemented. Mocked.` });
+    const courseToDelete = coursesList.find(c => c.course_id === courseId);
+    if (!courseToDelete) return;
+
+    console.log(`Attempting to delete course: ${courseId}`);
+    setCoursesList(prev => prev.filter(c => c.course_id !== courseId));
+    toast({ title: 'Course Deleted (Mock)', description: `Course ${courseToDelete.title} has been removed from the list.` });
   };
 
   const handleAddNewCourse = async (data: NewCourseFormData) => {
@@ -149,7 +151,7 @@ export default function CourseManagementPage() {
       created_at: new Date().toISOString(),
       updated_at: new Date().toISOString(),
     };
-    setCoursesList(prev => [newCourse, ...prev]); // Add to the beginning of the list for visibility
+    setCoursesList(prev => [newCourse, ...prev]); 
     
     toast({
       title: 'Course Created (Mock)',
@@ -332,3 +334,5 @@ export default function CourseManagementPage() {
     </div>
   );
 }
+
+    
