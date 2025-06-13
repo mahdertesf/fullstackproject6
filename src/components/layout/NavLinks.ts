@@ -1,7 +1,7 @@
 
 import type { UserRole } from '@/types';
 import type { LucideIcon } from 'lucide-react';
-import { Home, BookOpen, Users, Building, FileText, Settings, Speaker, BarChart3, GraduationCap, Edit3, ShieldCheck, Megaphone, ListChecks, HardHat } from 'lucide-react';
+import { Home, BookOpen, Users, Building, FileText, Settings, Speaker, BarChart3, GraduationCap, Edit3, ShieldCheck, Megaphone, ListChecks, HardHat, UserCircle } from 'lucide-react';
 
 export interface NavLink {
   href: string;
@@ -13,7 +13,7 @@ export interface NavLink {
 
 export const navLinks: NavLink[] = [
   { href: '/dashboard', label: 'Dashboard', icon: Home, roles: 'all' },
-  { href: '/profile', label: 'My Profile', icon: Users, roles: 'all' },
+  { href: '/profile', label: 'My Profile', icon: UserCircle, roles: 'all' },
   { href: '/courses', label: 'Course Catalog', icon: BookOpen, roles: 'all' },
   { href: '/departments', label: 'Departments', icon: Building, roles: 'all' },
   
@@ -30,7 +30,7 @@ export const navLinks: NavLink[] = [
 
 
   // Staff specific (Admin also gets these)
-  { href: '/staff/user-management', label: 'Manage Users', icon: Users, roles: ['Staff'] }, // Staff can manage Students/Teachers
+  { href: '/staff/user-management', label: 'Manage Users', icon: Users, roles: ['Staff'] },
   { href: '/staff/course-management', label: 'Manage Courses', icon: Settings, roles: ['Staff'] },
   { href: '/staff/semester-management', label: 'Manage Semesters', icon: BarChart3, roles: ['Staff'] },
   { href: '/staff/schedule-courses', label: 'Schedule Courses', icon: Edit3, roles: ['Staff'] },
@@ -64,7 +64,8 @@ export const getFilteredNavLinks = (role: UserRole, isSuperAdmin: boolean = fals
         'Dashboard', 'My Profile', 
         'My Courses', 'My Schedule', 'Course Catalog', 'Course Registration', 'My Transcript', 
         'Departments', 'AI Study Guide', 
-        'Post Announcement', 'View Announcements', 'Create Announcement', 
+        'Post Announcement', 'View Announcements', 
+        'Create Announcement', 
         'Manage Users', 'Full User Management', 
         'Manage Courses', 'Manage Semesters', 'Schedule Courses', 
         'Manage Departments', 'Campus Infrastructure', 'Audit Log', 'Admin Settings'
