@@ -1,3 +1,4 @@
+
 'use client';
 
 import { useState, useMemo } from 'react';
@@ -15,7 +16,7 @@ const ITEMS_PER_PAGE = 9;
 
 export default function CourseCatalogPage() {
   const [searchTerm, setSearchTerm] = useState('');
-  const [selectedDepartment, setSelectedDepartment] = useState<string>('');
+  const [selectedDepartment, setSelectedDepartment] = useState<string>(''); // Empty string for initial placeholder state
   const [currentPage, setCurrentPage] = useState(1);
 
   const coursesWithDepartments = useMemo(() => {
@@ -32,7 +33,10 @@ export default function CourseCatalogPage() {
         course.course_code.toLowerCase().includes(searchTerm.toLowerCase()) ||
         (course.description && course.description.toLowerCase().includes(searchTerm.toLowerCase()));
       
-      const matchesDepartment = selectedDepartment === '' || course.department_id === parseInt(selectedDepartment);
+      const isFilteringBySpecificDepartment = selectedDepartment !== '' && selectedDepartment !== 'all';
+      const matchesDepartment = isFilteringBySpecificDepartment
+        ? (course.department_id != null && course.department_id === parseInt(selectedDepartment))
+        : true; // If selectedDepartment is '' (initial/placeholder) or 'all', then all departments match.
       
       return matchesSearchTerm && matchesDepartment;
     });
@@ -81,7 +85,7 @@ export default function CourseCatalogPage() {
               <SelectValue placeholder="All Departments" />
             </SelectTrigger>
             <SelectContent>
-              <SelectItem value="">All Departments</SelectItem>
+              <SelectItem value="all">All Departments</SelectItem>
               {mockDepartments.map((dept) => (
                 <SelectItem key={dept.department_id} value={String(dept.department_id)}>
                   {dept.name}
