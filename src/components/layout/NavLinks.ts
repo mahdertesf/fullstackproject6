@@ -1,7 +1,7 @@
 
 import type { UserRole } from '@/types';
 import type { LucideIcon } from 'lucide-react';
-import { Home, BookOpen, Users, Building, FileText, Settings, Speaker, BarChart3, GraduationCap, Edit3, ShieldCheck, Megaphone } from 'lucide-react';
+import { Home, BookOpen, Users, Building, FileText, Settings, Speaker, BarChart3, GraduationCap, Edit3, ShieldCheck, Megaphone, ListChecks, HardHat } from 'lucide-react';
 
 export interface NavLink {
   href: string;
@@ -39,15 +39,16 @@ export const navLinks: NavLink[] = [
   // Admin specific (Super Admin)
   { href: '/admin/full-user-management', label: 'Full User Management', icon: Users, roles: 'superadmin' },
   { href: '/admin/department-management', label: 'Manage Departments', icon: Building, roles: 'superadmin' },
-  { href: '/admin/infrastructure', label: 'Campus Infrastructure', icon: Settings, roles: 'superadmin' },
-  { href: '/admin/audit-log', label: 'Audit Log', icon: FileText, roles: 'superadmin' },
+  { href: '/admin/infrastructure', label: 'Campus Infrastructure', icon: HardHat, roles: 'superadmin' },
+  { href: '/admin/audit-log', label: 'Audit Log', icon: ListChecks, roles: 'superadmin' },
+  { href: '/admin/settings', label: 'Admin Settings', icon: Settings, roles: 'superadmin' },
 ];
 
 export const getFilteredNavLinks = (role: UserRole, isSuperAdmin: boolean = false): NavLink[] => {
   return navLinks.filter(link => {
     if (link.roles === 'all') return true;
     if (isSuperAdmin && link.roles === 'superadmin') return true;
-    // SuperAdmin inherits Staff roles, ensure this logic is correct
+    // SuperAdmin inherits Staff roles
     if (isSuperAdmin && Array.isArray(link.roles) && link.roles.includes('Staff')) return true;
     return Array.isArray(link.roles) && link.roles.includes(role);
   }).map(link => ({
@@ -58,9 +59,16 @@ export const getFilteredNavLinks = (role: UserRole, isSuperAdmin: boolean = fals
       if (isSuperAdmin && Array.isArray(childLink.roles) && childLink.roles.includes('Staff')) return true;
       return Array.isArray(childLink.roles) && childLink.roles.includes(role);
     }) : undefined
-  })).sort((a, b) => { // Optional: basic sort order if needed
-      const order = ['Dashboard', 'My Profile', 'My Courses', 'My Schedule', 'Course Catalog', 'Course Registration', 'My Transcript', 'Departments', 'AI Study Guide', 'Post Announcement', 'View Announcements', 'Create Announcement', 'Manage Users', 'Full User Management', 'Manage Courses', 'Manage Semesters', 'Schedule Courses', 'Manage Departments', 'Campus Infrastructure', 'Audit Log'];
+  })).sort((a, b) => { 
+      const order = [
+        'Dashboard', 'My Profile', 
+        'My Courses', 'My Schedule', 'Course Catalog', 'Course Registration', 'My Transcript', 
+        'Departments', 'AI Study Guide', 
+        'Post Announcement', 'View Announcements', 'Create Announcement', 
+        'Manage Users', 'Full User Management', 
+        'Manage Courses', 'Manage Semesters', 'Schedule Courses', 
+        'Manage Departments', 'Campus Infrastructure', 'Audit Log', 'Admin Settings'
+      ];
       return order.indexOf(a.label) - order.indexOf(b.label);
   });
 };
-

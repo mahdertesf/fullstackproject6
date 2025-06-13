@@ -20,7 +20,7 @@ export default function AppSidebar({ className }: AppSidebarProps) {
 
   if (!user) return null;
 
-  const filteredLinks = getFilteredNavLinks(user.role, user.isSuperAdmin);
+  const filteredLinks = getFilteredNavLinks(user.role, user.isSuperAdmin || false);
 
   return (
     <aside className={cn("hidden md:flex flex-col h-full w-64 border-r bg-sidebar text-sidebar-foreground fixed left-0 top-0 pt-16", className)}>
@@ -58,7 +58,7 @@ export function MobileAppSidebar() {
 
   if (!user) return null;
 
-  const filteredLinks = getFilteredNavLinks(user.role, user.isSuperAdmin);
+  const filteredLinks = getFilteredNavLinks(user.role, user.isSuperAdmin || false);
   
   return (
     <div className="flex flex-col h-full bg-card">
