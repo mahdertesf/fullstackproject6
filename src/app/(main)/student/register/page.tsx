@@ -9,10 +9,10 @@ import {
   mockScheduledCourses, 
   mockCourses, 
   mockSemesters, 
-  mockRegistrations, // Imported mock data array for registrations
+  mockRegistrations,
   mockUserProfiles,
   mockPrerequisites
-} from '@/lib/data'; // All data sourced from mock data files
+} from '@/lib/data'; 
 import type { UserProfile, ScheduledCourse, Course, Semester, Registration } from '@/types';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle, CardFooter } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
@@ -46,14 +46,24 @@ export default function StudentCourseRegistrationPage() {
 
   // Determine current and future semesters for selection
   const availableSemestersForRegistration = useMemo(() => {
+    console.log("Current date for semester check:", now);
     return mockSemesters
-      .filter(sem => new Date(sem.registration_end_date) >= now) 
+      .filter(sem => {
+        const regStartDate = new Date(sem.registration_start_date);
+        const regEndDate = new Date(sem.registration_end_date);
+        const isOpen = regStartDate <= now && regEndDate >= now;
+        console.log(`Semester: ${sem.name}, Reg Start: ${regStartDate}, Reg End: ${regEndDate}, Is Open: ${isOpen}`);
+        return isOpen;
+      }) 
       .sort((a, b) => new Date(a.start_date).getTime() - new Date(b.start_date).getTime());
   }, [now]);
 
   useEffect(() => {
     if (availableSemestersForRegistration.length > 0 && !selectedSemesterId) {
       setSelectedSemesterId(String(availableSemestersForRegistration[0].semester_id));
+    } else if (availableSemestersForRegistration.length === 0 && !selectedSemesterId) {
+      // If no semesters are open, ensure we don't try to select one
+      setSelectedSemesterId(undefined); 
     }
   }, [availableSemestersForRegistration, selectedSemesterId]);
 
@@ -68,7 +78,6 @@ export default function StudentCourseRegistrationPage() {
 
 
   useEffect(() => {
-    // All data sources for course listing and checks are from mock data
     if (user && user.role === 'Student' && selectedSemesterId && selectedSemester) {
       setIsLoading(true);
       const studentUser = user as UserProfile;
@@ -104,11 +113,11 @@ export default function StudentCourseRegistrationPage() {
             prerequisitesMet = coursePrereqs.every(p => completedCourseIds.includes(p.prerequisite_course_id));
           }
           
-          const isRegistrationOpen = new Date(selectedSemester.registration_start_date) <= now && new Date(selectedSemester.registration_end_date) >= now;
+          const isRegistrationOpenForThisCourse = new Date(selectedSemester.registration_start_date) <= now && new Date(selectedSemester.registration_end_date) >= now;
           const isAddDropOpen = new Date(selectedSemester.add_drop_start_date) <= now && new Date(selectedSemester.add_drop_end_date) >= now;
 
 
-          const canRegister = !isRegistered && prerequisitesMet && sc.current_enrollment < sc.max_capacity && isRegistrationOpen;
+          const canRegister = !isRegistered && prerequisitesMet && sc.current_enrollment < sc.max_capacity && isRegistrationOpenForThisCourse;
           const canDrop = isRegistered && isAddDropOpen;
 
           return {
@@ -130,6 +139,7 @@ export default function StudentCourseRegistrationPage() {
     } else if (user && user.role !== 'Student') {
       router.replace('/dashboard');
     } else if (!selectedSemesterId || !selectedSemester) {
+       // if no semester is selected (e.g., none are open), clear courses and stop loading
       setAvailableCourses([]); 
       setIsLoading(false);
     }
@@ -138,13 +148,11 @@ export default function StudentCourseRegistrationPage() {
   const handleRegister = (scheduledCourseId: number) => {
     if (!user || !selectedSemesterId || !selectedSemester) return;
     
-    // This function directly modifies the imported mockRegistrations and mockScheduledCourses arrays.
-    console.log("Attempting mock registration...");
+    console.log("Attempting mock registration for course ID:", scheduledCourseId);
     const studentUser = user as UserProfile;
     const courseToRegister = availableCourses.find(c => c.scheduled_course_id === scheduledCourseId);
 
     if (courseToRegister && courseToRegister.canRegister) {
-      // MOCK ACTION: Directly modify mockRegistrations and mockScheduledCourses from src/lib/data.ts
       console.log("Registering for course (mock):", scheduledCourseId, "for student:", studentUser.user_id);
       const newRegistrationId = Math.max(0, ...mockRegistrations.map(r => r.registration_id)) + 1;
       const newReg: Registration = {
@@ -158,7 +166,8 @@ export default function StudentCourseRegistrationPage() {
         student: studentUser,
       };
       
-      mockRegistrations.push(newReg); // Modifying imported mock array
+      // Directly modify the imported mockRegistrations array for persistence during session
+      mockRegistrations.push(newReg); 
 
       setAvailableCourses(prev => prev.map(c => 
         c.scheduled_course_id === scheduledCourseId ? { ...c, isRegistered: true, canRegister: false, current_enrollment: c.current_enrollment + 1, canDrop: new Date(selectedSemester!.add_drop_end_date) >= now && new Date(selectedSemester!.add_drop_start_date) <= now } : c
@@ -167,7 +176,8 @@ export default function StudentCourseRegistrationPage() {
       
       const scIndex = mockScheduledCourses.findIndex(sc => sc.scheduled_course_id === scheduledCourseId);
       if (scIndex > -1) {
-        mockScheduledCourses[scIndex].current_enrollment +=1; // Modifying imported mock array
+         // Directly modify the imported mockScheduledCourses array
+        mockScheduledCourses[scIndex].current_enrollment +=1;
       }
 
       toast({ title: 'Registration Successful (Mock)', description: `You have been registered for ${courseToRegister.courseDetails?.title}.` });
@@ -184,18 +194,17 @@ export default function StudentCourseRegistrationPage() {
   const handleDrop = (scheduledCourseId: number) => {
      if (!user || !selectedSemester || !selectedSemesterId) return;
       
-      // This function directly modifies the imported mockRegistrations and mockScheduledCourses arrays.
-      console.log("Attempting mock drop...");
+      console.log("Attempting mock drop for course ID:", scheduledCourseId);
       const studentUser = user as UserProfile;
       const regToDrop = studentRegistrations.find(r => r.scheduled_course_id === scheduledCourseId);
       const courseToUpdate = availableCourses.find(c => c.scheduled_course_id === scheduledCourseId);
 
       if (regToDrop && courseToUpdate?.canDrop) {
-        // MOCK ACTION: Directly modify mockRegistrations and mockScheduledCourses from src/lib/data.ts
         console.log("Dropping course (mock):", scheduledCourseId, "for student:", studentUser.user_id);
         const regIndex = mockRegistrations.findIndex(r => r.registration_id === regToDrop.registration_id);
         if (regIndex > -1) {
-            mockRegistrations.splice(regIndex, 1);  // Modifying imported mock array
+            // Directly modify the imported mockRegistrations array
+            mockRegistrations.splice(regIndex, 1);  
         }
 
         setStudentRegistrations(prev => prev.filter(r => r.registration_id !== regToDrop.registration_id));
@@ -211,7 +220,8 @@ export default function StudentCourseRegistrationPage() {
 
         const scIndex = mockScheduledCourses.findIndex(sc => sc.scheduled_course_id === scheduledCourseId);
         if (scIndex > -1) {
-            mockScheduledCourses[scIndex].current_enrollment = Math.max(0, mockScheduledCourses[scIndex].current_enrollment -1); // Modifying imported mock array
+            // Directly modify the imported mockScheduledCourses array
+            mockScheduledCourses[scIndex].current_enrollment = Math.max(0, mockScheduledCourses[scIndex].current_enrollment -1); 
         }
         toast({ title: 'Course Dropped (Mock)', description: `You have dropped ${courseToUpdate?.courseDetails?.title}.` });
       } else {
@@ -268,7 +278,7 @@ export default function StudentCourseRegistrationPage() {
          <Card><CardContent className="py-6 text-center text-muted-foreground">No semesters are currently open for registration.</CardContent></Card>
       )}
       
-      {!isLoading && selectedSemesterId && !selectedSemester && (
+      {!isLoading && selectedSemesterId && !selectedSemester && availableSemestersForRegistration.length > 0 && (
           <Card><CardContent className="py-6 text-center text-muted-foreground">Please select a valid semester.</CardContent></Card>
       )}
 
