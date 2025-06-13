@@ -28,6 +28,7 @@ interface EnrichedScheduledCourse extends ScheduledCourse {
 }
 
 const ITEMS_PER_PAGE = 10;
+const NO_ROOM_VALUE = "none"; // Consistent with ScheduleCourseForm
 
 export default function ScheduleCoursesPage() {
   const { user } = useAuthStore();
@@ -103,12 +104,17 @@ export default function ScheduleCoursesPage() {
 
     const newScheduledCourseId = Math.max(...scheduledCoursesList.map(sc => sc.scheduled_course_id), 0) + 1;
     
+    let finalRoomId: number | null = null;
+    if (data.room_id && data.room_id !== NO_ROOM_VALUE) {
+        finalRoomId = parseInt(data.room_id);
+    }
+
     const newScheduledCourse: ScheduledCourse = {
         scheduled_course_id: newScheduledCourseId,
         course_id: parseInt(data.course_id),
         semester_id: parseInt(data.semester_id),
         teacher_id: parseInt(data.teacher_id),
-        room_id: data.room_id ? parseInt(data.room_id) : null,
+        room_id: finalRoomId,
         section_number: data.section_number,
         max_capacity: data.max_capacity,
         current_enrollment: 0, // New courses start with 0 enrollment

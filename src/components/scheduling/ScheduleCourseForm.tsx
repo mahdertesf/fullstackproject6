@@ -29,6 +29,8 @@ interface ScheduleCourseFormProps {
   rooms: Room[];
 }
 
+const NO_ROOM_VALUE = "none"; // Special value for no room selection
+
 export default function ScheduleCourseForm({
   onSubmit,
   onCancel,
@@ -44,7 +46,7 @@ export default function ScheduleCourseForm({
       course_id: undefined,
       semester_id: undefined,
       teacher_id: undefined,
-      room_id: '',
+      room_id: '', // Default to empty string, placeholder will show
       section_number: '',
       max_capacity: 50,
       days_of_week: '',
@@ -145,14 +147,14 @@ export default function ScheduleCourseForm({
                 render={({ field }) => (
                     <FormItem>
                     <FormLabel>Room (Optional)</FormLabel>
-                    <Select onValueChange={field.onChange} defaultValue={field.value}>
+                    <Select onValueChange={field.onChange} value={field.value || ''}> {/* Ensure value is controlled and defaults to empty string for placeholder */}
                         <FormControl>
                         <SelectTrigger>
                             <SelectValue placeholder="Select a room" />
                         </SelectTrigger>
                         </FormControl>
                         <SelectContent>
-                        <SelectItem value="">No specific room</SelectItem>
+                        <SelectItem value={NO_ROOM_VALUE}>No specific room</SelectItem>
                         {rooms.map(room => (
                             <SelectItem key={room.room_id} value={String(room.room_id)}>
                             {room.building?.name} - {room.room_number} (Cap: {room.capacity})
