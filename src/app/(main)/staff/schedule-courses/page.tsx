@@ -75,23 +75,37 @@ export default function ScheduleCoursesPage() {
 
   const handleScheduleNewCourse = () => {
     toast({ title: 'Action Required', description: 'Schedule new course form to be implemented.' });
-    // setIsScheduleDialogOpen(true); // When dialog is ready
+    // Example: setIsScheduleDialogOpen(true); // When dialog and form component are ready
   };
 
   const handleEditScheduledCourse = (id: number) => {
     toast({ title: 'Action Required', description: `Edit form for scheduled course ${id} to be implemented.` });
-    // setEditingScheduledCourse(sc); setIsEditDialogOpen(true); // When dialog is ready
+    // Example: 
+    // const courseToEdit = scheduledCoursesList.find(sc => sc.scheduled_course_id === id);
+    // if (courseToEdit) {
+    //   setEditingScheduledCourse(courseToEdit); 
+    //   setIsEditDialogOpen(true); // When dialog and form component are ready
+    // }
   };
 
   const handleDeleteScheduledCourse = (id: number) => {
-    // Mock deletion
-    setScheduledCoursesList(prev => prev.filter(sc => sc.scheduled_course_id !== id));
-    toast({ title: 'Scheduled Course Deleted (Mock)', description: `Scheduled course ${id} has been removed from the list.` });
+    const courseToDelete = scheduledCoursesList.find(sc => sc.scheduled_course_id === id);
+    if (courseToDelete) {
+        setScheduledCoursesList(prev => prev.filter(sc => sc.scheduled_course_id !== id));
+        toast({ title: 'Scheduled Course Deleted (Mock)', description: `Scheduled course for ${courseToDelete.course?.title || 'ID: '+id} has been removed from the list.` });
+    } else {
+        toast({ variant: 'destructive', title: 'Error', description: 'Could not find the scheduled course to delete.'});
+    }
   };
   
   const formatTime = (timeString: string | null | undefined) => {
     if (!timeString) return 'N/A';
+    // Check if timeString is already in hh:mm a format from previous processing or if it's HH:mm:ss
+    if (timeString.includes('AM') || timeString.includes('PM')) return timeString;
+
     const [hours, minutes] = timeString.split(':');
+    if (isNaN(parseInt(hours)) || isNaN(parseInt(minutes))) return 'Invalid Time';
+    
     const date = new Date(0, 0, 0, parseInt(hours), parseInt(minutes));
     return format(date, 'hh:mm a');
   };
@@ -210,8 +224,9 @@ export default function ScheduleCoursesPage() {
         </div>
       )}
       
-      {/* Dialogs for Schedule New/Edit will go here */}
+      {/* Dialogs for Schedule New/Edit will go here when fully implemented */}
 
     </div>
   );
 }
+
