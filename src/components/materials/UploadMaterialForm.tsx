@@ -17,7 +17,7 @@ import { Textarea } from '@/components/ui/textarea';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { CourseMaterialUploadSchema, type CourseMaterialUploadFormData } from '@/lib/schemas';
 import { Loader2 } from 'lucide-react';
-import { useState } from 'react';
+import { useState, useEffect } from 'react'; // Added useEffect here
 
 interface UploadMaterialFormProps {
   onSubmit: (data: CourseMaterialUploadFormData) => Promise<void>;
@@ -41,15 +41,8 @@ export default function UploadMaterialForm({ onSubmit, onCancel, isSubmitting }:
 
   const watchedMaterialType = form.watch("material_type");
 
-  // Update local state when form's material_type changes
-  // This is to ensure conditional rendering of fields works correctly
-  // as react-hook-form might not immediately update the component on watch
-  useState(() => {
-    setMaterialType(watchedMaterialType);
-  });
-  
-  // Effect to sync local state with form state if it changes from outside
-  React.useEffect(() => {
+  // Effect to sync local state with form state if it changes
+  useEffect(() => {
     setMaterialType(watchedMaterialType);
   }, [watchedMaterialType]);
 
@@ -103,7 +96,7 @@ export default function UploadMaterialForm({ onSubmit, onCancel, isSubmitting }:
               <Select 
                 onValueChange={(value) => {
                   field.onChange(value);
-                  setMaterialType(value as 'File' | 'Link');
+                  // setMaterialType is handled by the useEffect watching watchedMaterialType
                 }} 
                 defaultValue={field.value}
               >
