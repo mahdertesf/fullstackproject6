@@ -74,6 +74,7 @@ export const mockRooms: Room[] = [
   { room_id: 1, building_id: 1, room_number: 'A101', capacity: 60, type: 'Lecture Hall', created_at: new Date().toISOString(), updated_at: new Date().toISOString(), building: mockBuildings[0] },
   { room_id: 2, building_id: 1, room_number: 'A102', capacity: 40, type: 'Lab', created_at: new Date().toISOString(), updated_at: new Date().toISOString(), building: mockBuildings[0] },
   { room_id: 3, building_id: 2, room_number: 'T205', capacity: 50, type: 'Classroom', created_at: new Date().toISOString(), updated_at: new Date().toISOString(), building: mockBuildings[1] },
+  { room_id: 4, building_id: 2, room_number: 'T208', capacity: 30, type: 'Seminar Room', created_at: new Date().toISOString(), updated_at: new Date().toISOString(), building: mockBuildings[1] },
 ];
 
 
@@ -86,6 +87,8 @@ export const mockScheduledCourses: ScheduledCourse[] = [
     { scheduled_course_id: 1, course_id: 1, semester_id: 2, teacher_id: 3, room_id: 1, section_number: 'S1', max_capacity: 50, current_enrollment: 25, days_of_week: 'MWF', start_time: '09:00:00', end_time: '09:50:00', created_at: new Date().toISOString(), updated_at: new Date().toISOString(), course: mockCourses[0], semester: mockSemesters[1], teacher: mockTeachers[0], room: mockRooms[0] },
     { scheduled_course_id: 2, course_id: 5, semester_id: 2, teacher_id: 3, room_id: 3, section_number: 'S1', max_capacity: 40, current_enrollment: 30, days_of_week: 'TTH', start_time: '14:00:00', end_time: '15:20:00', created_at: new Date().toISOString(), updated_at: new Date().toISOString(), course: mockCourses[4], semester: mockSemesters[1], teacher: mockTeachers[0], room: mockRooms[2] },
     { scheduled_course_id: 3, course_id: 6, semester_id: 2, teacher_id: 6, room_id: 2, section_number: 'S1', max_capacity: 35, current_enrollment: 15, days_of_week: 'MWF', start_time: '10:00:00', end_time: '10:50:00', created_at: new Date().toISOString(), updated_at: new Date().toISOString(), course: mockCourses[5], semester: mockSemesters[1], teacher: mockTeachers[1], room: mockRooms[1] },
+    { scheduled_course_id: 4, course_id: 1, semester_id: 2, teacher_id: 3, room_id: 4, section_number: 'S2', max_capacity: 30, current_enrollment: 10, days_of_week: 'TTH', start_time: '10:00:00', end_time: '11:20:00', created_at: new Date().toISOString(), updated_at: new Date().toISOString(), course: mockCourses[0], semester: mockSemesters[1], teacher: mockTeachers[0], room: mockRooms[3] },
+    { scheduled_course_id: 5, course_id: 2, semester_id: 2, teacher_id: 6, room_id: 1, section_number: 'S1', max_capacity: 60, current_enrollment: 40, days_of_week: 'MWF', start_time: '13:00:00', end_time: '13:50:00', created_at: new Date().toISOString(), updated_at: new Date().toISOString(), course: mockCourses[1], semester: mockSemesters[1], teacher: mockTeachers[1], room: mockRooms[0] },
 ];
 
 export const mockRegistrations: Registration[] = [
@@ -94,6 +97,8 @@ export const mockRegistrations: Registration[] = [
     { registration_id: 3, student_id: 5, scheduled_course_id: 1, registration_date: new Date().toISOString(), status: 'Completed', final_grade: 'A', grade_points: 4.0, updated_at: new Date().toISOString(), student: mockStudents[1], scheduledCourse: mockScheduledCourses[0], overall_percentage: 92, final_letter_grade: 'A' },
     { registration_id: 4, student_id: 7, scheduled_course_id: 1, registration_date: new Date().toISOString(), status: 'Registered', updated_at: new Date().toISOString(), student: mockStudents[2], scheduledCourse: mockScheduledCourses[0], overall_percentage: null, final_letter_grade: null },
     { registration_id: 5, student_id: 7, scheduled_course_id: 3, registration_date: new Date().toISOString(), status: 'Registered', updated_at: new Date().toISOString(), student: mockStudents[2], scheduledCourse: mockScheduledCourses[2], overall_percentage: null, final_letter_grade: null },
+    { registration_id: 6, student_id: 5, scheduled_course_id: 4, registration_date: new Date().toISOString(), status: 'Registered', updated_at: new Date().toISOString(), student: mockStudents[1], scheduledCourse: mockScheduledCourses[3], overall_percentage: null, final_letter_grade: null }, // Sara Taye in SE301 S2
+    { registration_id: 7, student_id: 7, scheduled_course_id: 5, registration_date: new Date().toISOString(), status: 'Registered', updated_at: new Date().toISOString(), student: mockStudents[2], scheduledCourse: mockScheduledCourses[4], overall_percentage: null, final_letter_grade: null }, // Frehiwot Assefa in CE205 S1
 ];
 
 export const mockCourseMaterials: CourseMaterial[] = [
@@ -192,6 +197,12 @@ export const mockAssessments: Assessment[] = [
   { assessment_id: 3, scheduled_course_id: 1, name: 'Final Project', max_score: 50, assessment_type: 'Project', created_at: new Date().toISOString(), updated_at: new Date().toISOString() },
   { assessment_id: 4, scheduled_course_id: 2, name: 'Quiz 1', max_score: 10, assessment_type: 'Quiz', created_at: new Date().toISOString(), updated_at: new Date().toISOString() },
   { assessment_id: 5, scheduled_course_id: 2, name: 'Final Exam', max_score: 90, assessment_type: 'Exam', created_at: new Date().toISOString(), updated_at: new Date().toISOString() },
+  // Assessments for SE301 Section S2 (scheduled_course_id: 4)
+  { assessment_id: 6, scheduled_course_id: 4, name: 'S2 Homework 1', max_score: 15, assessment_type: 'Homework', created_at: new Date().toISOString(), updated_at: new Date().toISOString() },
+  { assessment_id: 7, scheduled_course_id: 4, name: 'S2 Midterm', max_score: 35, assessment_type: 'Exam', created_at: new Date().toISOString(), updated_at: new Date().toISOString() },
+  // Assessments for CE205 Section S1 (scheduled_course_id: 5)
+  { assessment_id: 8, scheduled_course_id: 5, name: 'Analysis Assignment 1', max_score: 25, assessment_type: 'Assignment', created_at: new Date().toISOString(), updated_at: new Date().toISOString() },
+  { assessment_id: 9, scheduled_course_id: 5, name: 'Structural Design Project', max_score: 75, assessment_type: 'Project', created_at: new Date().toISOString(), updated_at: new Date().toISOString() },
 ];
 
 export const mockStudentAssessmentScores: StudentAssessmentScore[] = [
@@ -204,4 +215,13 @@ export const mockStudentAssessmentScores: StudentAssessmentScore[] = [
   { student_assessment_score_id: 5, registration_id: 4, assessment_id: 2, score_achieved: 20 },
   // student1 (registration_id: 2) in SE450 (scheduled_course_id: 2)
   { student_assessment_score_id: 6, registration_id: 2, assessment_id: 4, score_achieved: 8 },
+  // Scores for student2 (Sara Taye, registration_id: 6) in SE301 S2 (scheduled_course_id: 4)
+  { student_assessment_score_id: 7, registration_id: 6, assessment_id: 6, score_achieved: 12 }, // S2 Homework 1
+  { student_assessment_score_id: 8, registration_id: 6, assessment_id: 7, score_achieved: 30 }, // S2 Midterm
+  // Scores for student3 (Frehiwot Assefa, registration_id: 7) in CE205 S1 (scheduled_course_id: 5)
+  { student_assessment_score_id: 9, registration_id: 7, assessment_id: 8, score_achieved: 22 }, // Analysis Assignment 1
+  { student_assessment_score_id: 10, registration_id: 7, assessment_id: 9, score_achieved: 65 },// Structural Design Project
 ];
+
+
+    
