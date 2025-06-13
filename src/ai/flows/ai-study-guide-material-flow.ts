@@ -11,7 +11,7 @@
 import {ai} from '@/ai/genkit';
 import {z} from 'genkit';
 
-export const AiStudyGuideMaterialInputSchema = z.object({
+const AiStudyGuideMaterialInputSchema = z.object({
   materialTitle: z.string().describe('The title of the course material.'),
   materialDescription: z.string().optional().describe('The description of the course material, if available.'),
   courseName: z.string().describe('The name of the course this material belongs to.'),
@@ -20,7 +20,7 @@ export const AiStudyGuideMaterialInputSchema = z.object({
 });
 export type AiStudyGuideMaterialInput = z.infer<typeof AiStudyGuideMaterialInputSchema>;
 
-export const AiStudyGuideMaterialOutputSchema = z.object({
+const AiStudyGuideMaterialOutputSchema = z.object({
   generatedText: z.string().describe('The AI-generated text based on the requested action.'),
 });
 export type AiStudyGuideMaterialOutput = z.infer<typeof AiStudyGuideMaterialOutputSchema>;
