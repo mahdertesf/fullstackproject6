@@ -12,12 +12,11 @@ import {
   BarChart3, 
   GraduationCap, 
   Edit3, 
-  ShieldCheck, 
   Megaphone, 
   ListChecks, 
   HardHat, 
   UserCircle, 
-  Layers // Ensure Layers is imported
+  Layers 
 } from 'lucide-react';
 
 export interface NavLink {
@@ -35,11 +34,10 @@ export const navLinks: NavLink[] = [
   { href: '/departments', label: 'Departments', icon: Building, roles: 'all' },
   
   // Student specific
-  { href: '/student/my-courses', label: 'My Courses', icon: Layers, roles: ['Student'] },
   { href: '/student/my-schedule', label: 'My Schedule', icon: FileText, roles: ['Student'] },
   { href: '/student/register', label: 'Course Registration', icon: Edit3, roles: ['Student'] },
   { href: '/student/transcript', label: 'My Transcript', icon: GraduationCap, roles: ['Student'] },
-  { href: '/study-guide', label: 'AI Study Guide', icon: ShieldCheck, roles: ['Student'] },
+  { href: '/study-guide', label: 'Materials & AI Guide', icon: Layers, roles: ['Student'] }, // Renamed and new icon
 
   // Teacher specific
   { href: '/teacher/my-courses', label: 'My Courses', icon: BookOpen, roles: ['Teacher'] },
@@ -66,6 +64,7 @@ export const getFilteredNavLinks = (role: UserRole, isSuperAdmin: boolean = fals
   return navLinks.filter(link => {
     if (link.roles === 'all') return true;
     if (isSuperAdmin && link.roles === 'superadmin') return true;
+    // SuperAdmins should also see 'Staff' role links
     if (isSuperAdmin && Array.isArray(link.roles) && link.roles.includes('Staff')) return true;
     return Array.isArray(link.roles) && link.roles.includes(role);
   }).map(link => ({
@@ -79,9 +78,9 @@ export const getFilteredNavLinks = (role: UserRole, isSuperAdmin: boolean = fals
   })).sort((a, b) => { 
       const order = [
         'Dashboard', 'My Profile', 
-        'My Courses', 'My Schedule', 'Course Catalog', 'Course Registration', 'My Transcript', 
-        'Departments', 'AI Study Guide', 
-        'Post Announcement', 'View Announcements', 
+        'My Schedule', 'Course Catalog', 'Course Registration', 'My Transcript', 
+        'Departments', 'Materials & AI Guide', // Updated label
+        'My Courses', 'Post Announcement', 'View Announcements', 
         'Create Announcement', 
         'Manage Users', 'Full User Management', 
         'Manage Courses', 'Manage Semesters', 'Schedule Courses', 
