@@ -1,3 +1,4 @@
+// src/app/(main)/staff/semester-management/page.tsx
 
 'use client';
 

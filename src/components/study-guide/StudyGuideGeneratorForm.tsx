@@ -1,3 +1,4 @@
+// src/components/study-guide/StudyGuideGeneratorForm.tsx
 'use client';
 
 import { zodResolver } from '@hookform/resolvers/zod';

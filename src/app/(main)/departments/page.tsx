@@ -1,3 +1,4 @@
+// src/app/(main)/departments/page.tsx
 'use client';
 
 import PageHeader from '@/components/shared/PageHeader';

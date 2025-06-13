@@ -1,3 +1,4 @@
+// src/components/announcements/AnnouncementGeneratorForm.tsx
 
 'use client';
 

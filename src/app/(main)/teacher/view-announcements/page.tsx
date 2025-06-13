@@ -1,3 +1,4 @@
+// src/app/(main)/teacher/view-announcements/page.tsx
 
 'use client';
 

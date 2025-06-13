@@ -1,3 +1,4 @@
+// src/components/infrastructure/buildings/AddBuildingForm.tsx
 
 'use client';
 

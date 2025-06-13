@@ -1,3 +1,4 @@
+// src/components/courses/CourseDetailsView.tsx
 
 import type { Course, Department, Prerequisite, UserProfile, Semester } from '@/types'; // Changed Teacher to UserProfile
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';

@@ -1,3 +1,4 @@
+// src/app/(main)/staff/course-management/page.tsx
 
 'use client';
 

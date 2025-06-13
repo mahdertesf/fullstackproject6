@@ -1,3 +1,4 @@
+// src/app/(main)/admin/full-user-management/page.tsx
 
 'use client';
 

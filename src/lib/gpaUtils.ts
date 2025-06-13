@@ -1,3 +1,4 @@
+// src/lib/gpaUtils.ts
 
 import type { EnrichedRegistration, Course } from '@/types';
 

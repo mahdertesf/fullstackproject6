@@ -1,3 +1,4 @@
+// src/app/(main)/study-guide/page.tsx
 
 'use client';
 

@@ -1,3 +1,4 @@
+// src/app/(main)/announcements/create/page.tsx
 
 'use client';
 

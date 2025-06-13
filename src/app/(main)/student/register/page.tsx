@@ -1,3 +1,4 @@
+// src/app/(main)/student/register/page.tsx
 
 'use client';
 
@@ -51,8 +52,9 @@ export default function StudentCourseRegistrationPage() {
       .filter(sem => {
         const regStartDate = new Date(sem.registration_start_date);
         const regEndDate = new Date(sem.registration_end_date);
+        // Ensure 'now' is between regStartDate and regEndDate (inclusive)
         const isOpen = regStartDate <= now && regEndDate >= now;
-        console.log(`Semester: ${sem.name}, Reg Start: ${regStartDate}, Reg End: ${regEndDate}, Is Open: ${isOpen}`);
+        console.log(`Semester: ${sem.name}, Reg Start: ${regStartDate.toISOString()}, Reg End: ${regEndDate.toISOString()}, Is Open: ${isOpen}`);
         return isOpen;
       }) 
       .sort((a, b) => new Date(a.start_date).getTime() - new Date(b.start_date).getTime());
@@ -71,8 +73,10 @@ export default function StudentCourseRegistrationPage() {
     if (selectedSemesterId) {
       const foundSemester = mockSemesters.find(s => s.semester_id === parseInt(selectedSemesterId));
       setSelectedSemester(foundSemester || null);
+       console.log("Selected semester:", foundSemester?.name);
     } else {
       setSelectedSemester(null);
+      console.log("No semester selected or found.");
     }
   }, [selectedSemesterId]);
 
@@ -83,28 +87,35 @@ export default function StudentCourseRegistrationPage() {
       const studentUser = user as UserProfile;
       const currentSemesterNumId = parseInt(selectedSemesterId);
 
+      // Get student's registrations specific to the selected semester
       const studentRegsForSemester = mockRegistrations.filter(
         reg => reg.student_id === studentUser.user_id && reg.scheduledCourse?.semester_id === currentSemesterNumId
       );
       setStudentRegistrations(studentRegsForSemester);
       
+      // Get IDs of courses student has completed
       const completedCourseIds = mockRegistrations
         .filter(reg => reg.student_id === studentUser.user_id && reg.status === 'Completed')
         .map(reg => reg.scheduledCourse?.course_id)
         .filter(Boolean) as number[];
 
+      // Filter scheduled courses for the selected semester and enrich them
       const coursesForSemester = mockScheduledCourses
         .filter(sc => sc.semester_id === currentSemesterNumId)
         .map(sc => {
           const courseDetails = mockCourses.find(c => c.course_id === sc.course_id);
           
+          // Department check: Only show courses from the student's department
+          // Unless the course has no department_id (e.g. general elective, not currently modeled this way)
+          // or student has no department_id (less likely for a registered student)
           if (studentUser.department_id && courseDetails?.department_id && courseDetails.department_id !== studentUser.department_id) {
-            return null; 
+            return null; // Skip this course if not in student's department
           }
 
           const teacherDetails = mockUserProfiles.find(t => t.user_id === sc.teacher_id);
           const isRegistered = studentRegsForSemester.some(reg => reg.scheduled_course_id === sc.scheduled_course_id);
           
+          // Check prerequisites
           const coursePrereqs = mockPrerequisites.filter(p => p.course_id === sc.course_id);
           let prerequisitesMet = true;
           let prerequisiteCourses: Course[] = [];
@@ -113,6 +124,7 @@ export default function StudentCourseRegistrationPage() {
             prerequisitesMet = coursePrereqs.every(p => completedCourseIds.includes(p.prerequisite_course_id));
           }
           
+          // Check registration and add/drop periods for the selected semester
           const isRegistrationOpenForThisCourse = new Date(selectedSemester.registration_start_date) <= now && new Date(selectedSemester.registration_end_date) >= now;
           const isAddDropOpen = new Date(selectedSemester.add_drop_start_date) <= now && new Date(selectedSemester.add_drop_end_date) >= now;
 
@@ -130,7 +142,7 @@ export default function StudentCourseRegistrationPage() {
             canRegister,
             canDrop,
           };
-        }).filter(Boolean) as AvailableCourseForRegistration[]; 
+        }).filter(Boolean) as AvailableCourseForRegistration[]; // Filter out nulls (e.g. courses from other depts)
       
       setAvailableCourses(coursesForSemester);
       setIsLoading(false);
@@ -148,7 +160,8 @@ export default function StudentCourseRegistrationPage() {
   const handleRegister = (scheduledCourseId: number) => {
     if (!user || !selectedSemesterId || !selectedSemester) return;
     
-    console.log("Attempting mock registration for course ID:", scheduledCourseId);
+    // Explicitly state this uses mock data
+    console.log("Attempting mock registration for course ID:", scheduledCourseId, "using mockRegistrations and mockScheduledCourses arrays.");
     const studentUser = user as UserProfile;
     const courseToRegister = availableCourses.find(c => c.scheduled_course_id === scheduledCourseId);
 
@@ -162,6 +175,7 @@ export default function StudentCourseRegistrationPage() {
         registration_date: new Date().toISOString(),
         status: 'Registered',
         updated_at: new Date().toISOString(),
+        // Populate related objects for immediate use if needed by other parts of the app
         scheduledCourse: mockScheduledCourses.find(sc => sc.scheduled_course_id === scheduledCourseId),
         student: studentUser,
       };
@@ -169,11 +183,13 @@ export default function StudentCourseRegistrationPage() {
       // Directly modify the imported mockRegistrations array for persistence during session
       mockRegistrations.push(newReg); 
 
+      // Update local state for immediate UI feedback
       setAvailableCourses(prev => prev.map(c => 
         c.scheduled_course_id === scheduledCourseId ? { ...c, isRegistered: true, canRegister: false, current_enrollment: c.current_enrollment + 1, canDrop: new Date(selectedSemester!.add_drop_end_date) >= now && new Date(selectedSemester!.add_drop_start_date) <= now } : c
       ));
       setStudentRegistrations(prev => [...prev, newReg]);
       
+      // Update the global mockScheduledCourses for enrollment count
       const scIndex = mockScheduledCourses.findIndex(sc => sc.scheduled_course_id === scheduledCourseId);
       if (scIndex > -1) {
          // Directly modify the imported mockScheduledCourses array
@@ -194,7 +210,8 @@ export default function StudentCourseRegistrationPage() {
   const handleDrop = (scheduledCourseId: number) => {
      if (!user || !selectedSemester || !selectedSemesterId) return;
       
-      console.log("Attempting mock drop for course ID:", scheduledCourseId);
+      // Explicitly state this uses mock data
+      console.log("Attempting mock drop for course ID:", scheduledCourseId, "using mockRegistrations and mockScheduledCourses arrays.");
       const studentUser = user as UserProfile;
       const regToDrop = studentRegistrations.find(r => r.scheduled_course_id === scheduledCourseId);
       const courseToUpdate = availableCourses.find(c => c.scheduled_course_id === scheduledCourseId);
@@ -207,6 +224,7 @@ export default function StudentCourseRegistrationPage() {
             mockRegistrations.splice(regIndex, 1);  
         }
 
+        // Update local state for immediate UI feedback
         setStudentRegistrations(prev => prev.filter(r => r.registration_id !== regToDrop.registration_id));
         setAvailableCourses(prev => prev.map(c => 
             c.scheduled_course_id === scheduledCourseId ? { 
@@ -214,10 +232,11 @@ export default function StudentCourseRegistrationPage() {
                 isRegistered: false, 
                 canRegister: c.prerequisitesMet && (c.current_enrollment -1 < c.max_capacity) && new Date(selectedSemester.registration_start_date) <= now && new Date(selectedSemester.registration_end_date) >= now,
                 current_enrollment: Math.max(0, c.current_enrollment -1),
-                canDrop: false
+                canDrop: false // Once dropped, cannot drop again immediately unless add/drop is still open & re-registered
             } : c
         ));
 
+        // Update the global mockScheduledCourses for enrollment count
         const scIndex = mockScheduledCourses.findIndex(sc => sc.scheduled_course_id === scheduledCourseId);
         if (scIndex > -1) {
             // Directly modify the imported mockScheduledCourses array

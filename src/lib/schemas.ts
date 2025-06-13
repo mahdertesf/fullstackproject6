@@ -1,3 +1,4 @@
+// src/lib/schemas.ts
 
 import { z } from 'zod';
 
@@ -173,4 +174,3 @@ export const AssessmentSchema = z.object({
   assessment_type: z.string().optional(),
 });
 export type AssessmentFormData = z.infer<typeof AssessmentSchema>;
-

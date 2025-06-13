@@ -1,3 +1,4 @@
+// src/app/(main)/admin/audit-log/page.tsx
 
 'use client';
 

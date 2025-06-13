@@ -1,3 +1,4 @@
+// src/components/infrastructure/rooms/EditRoomForm.tsx
 
 'use client';
 

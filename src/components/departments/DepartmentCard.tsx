@@ -1,3 +1,4 @@
+// src/components/departments/DepartmentCard.tsx
 import type { Department } from '@/types';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Building2 } from 'lucide-react';

@@ -1,3 +1,4 @@
+// src/app/(main)/student/my-schedule/page.tsx
 
 'use client';
 

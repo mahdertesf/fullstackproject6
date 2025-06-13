@@ -1,3 +1,4 @@
+// src/app/(main)/courses/[courseId]/page.tsx
 
 'use client';
 

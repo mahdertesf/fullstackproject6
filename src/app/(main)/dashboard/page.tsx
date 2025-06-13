@@ -1,3 +1,4 @@
+// src/app/(main)/dashboard/page.tsx
 
 'use client';
 

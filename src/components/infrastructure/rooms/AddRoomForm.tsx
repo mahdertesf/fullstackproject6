@@ -1,3 +1,4 @@
+// src/components/infrastructure/rooms/AddRoomForm.tsx
 
 'use client';
 

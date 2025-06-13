@@ -1,3 +1,4 @@
+// src/app/(main)/student/my-courses/page.tsx
 
 'use client';
 
@@ -25,7 +26,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle, CardFooter }
 import { Button } from '@/components/ui/button';
 import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from '@/components/ui/accordion';
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from '@/components/ui/dropdown-menu';
-import { Layers, ShieldAlert, BookOpenText, FileText, Link as LinkIcon, Download, Wand2, MoreVertical, HelpCircle, MessageSquareQuestion, Combine } from 'lucide-react';
+import { Layers, ShieldAlert, BookOpenText, FileText, Link as LinkIcon, Download, Wand2, MoreVertical, HelpCircle, MessageSquareQuote, Combine } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
 import Link from 'next/link';
 
@@ -194,7 +195,7 @@ export default function StudentMyCoursesPage() {
                                           <Combine className="mr-2 h-4 w-4" /> Summarize
                                         </DropdownMenuItem>
                                         <DropdownMenuItem onClick={() => handleAiAction('Generate Questions', material.title)}>
-                                          <MessageSquareQuestion className="mr-2 h-4 w-4" /> Generate Questions
+                                          <MessageSquareQuote className="mr-2 h-4 w-4" /> Generate Questions
                                         </DropdownMenuItem>
                                         <DropdownMenuItem onClick={() => handleAiAction('Explain Details', material.title)}>
                                           <HelpCircle className="mr-2 h-4 w-4" /> Explain Details

@@ -1,3 +1,4 @@
+// src/app/(main)/admin/settings/page.tsx
 
 'use client';
 

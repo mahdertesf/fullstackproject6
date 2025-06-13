@@ -1,3 +1,4 @@
+// src/app/(main)/admin/department-management/page.tsx
 
 'use client';
 

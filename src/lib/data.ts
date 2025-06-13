@@ -1,3 +1,4 @@
+// src/lib/data.ts
 
 import type { User, Department, Course, Student, Teacher, Staff, Semester, Announcement, ScheduledCourse, Registration, CourseMaterial, Assessment, UserProfile, Building, Room, Prerequisite, AuditLog, StudentAssessmentScore, AnnouncementTargetAudience } from '@/types';
 
@@ -302,5 +303,3 @@ export const gradePointMapping: Record<string, number> = {
   'F': 0.0,
 };
     
-
-

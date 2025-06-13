@@ -1,3 +1,4 @@
+// src/components/shared/PageHeader.tsx
 import type { LucideIcon } from 'lucide-react';
 
 interface PageHeaderProps {

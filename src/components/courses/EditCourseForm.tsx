@@ -1,3 +1,4 @@
+// src/components/courses/EditCourseForm.tsx
 
 'use client';
 

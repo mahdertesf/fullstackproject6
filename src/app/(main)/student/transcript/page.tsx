@@ -1,3 +1,4 @@
+// src/app/(main)/student/transcript/page.tsx
 
 'use client';
 

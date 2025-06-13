@@ -1,3 +1,4 @@
+// src/store/authStore.ts
 import { create } from 'zustand';
 import type { UserProfile, UserRole } from '@/types';
 import { mockUserProfiles } from '@/lib/data'; // For mock login

@@ -1,3 +1,4 @@
+// src/app/(auth)/login/page.tsx
 import LoginForm from '@/components/auth/LoginForm';
 import Image from 'next/image';
 

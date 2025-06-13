@@ -1,3 +1,4 @@
+// src/components/scheduling/ScheduleCourseForm.tsx
 
 'use client';
 

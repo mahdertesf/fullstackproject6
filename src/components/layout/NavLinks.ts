@@ -1,3 +1,4 @@
+// src/components/layout/NavLinks.ts
 
 import type { UserRole } from '@/types';
 import type { LucideIcon } from 'lucide-react';

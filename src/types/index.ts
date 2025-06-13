@@ -1,3 +1,4 @@
+// src/types/index.ts
 
 
 export type UserRole = 'Student' | 'Teacher' | 'Staff';
@@ -251,4 +252,3 @@ export interface TeacherSectionInfo {
   id: string; // scheduled_course_id
   name: string; // e.g., "SE301 - S1 (Spring 2024)"
 }
-

@@ -1,3 +1,4 @@
+// src/app/(main)/teacher/my-courses/[scheduledCourseId]/page.tsx
 
 'use client';
 
