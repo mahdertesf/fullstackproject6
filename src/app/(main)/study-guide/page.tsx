@@ -6,16 +6,21 @@ import StudyGuideGeneratorForm from '@/components/study-guide/StudyGuideGenerato
 import { useAuthStore } from '@/store/authStore';
 import { useRouter } from 'next/navigation';
 import { useEffect, useState, useMemo } from 'react';
-import { Layers, ShieldAlert, BookOpenText, FileText, Link as LinkIcon, Download, Wand2, Combine, MessageSquareQuote, HelpCircle } from 'lucide-react';
+import { Layers, ShieldAlert, BookOpenText, FileText, Link as LinkIcon, Download, Wand2, Combine, MessageSquareQuote, HelpCircle, Loader2 } from 'lucide-react';
 import { mockRegistrations, mockCourses, mockSemesters, mockCourseMaterials, mockScheduledCourses, mockUserProfiles } from '@/lib/data';
 import type { UserProfile, Semester, Course, CourseMaterial, Registration, ScheduledCourse } from '@/types';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from '@/components/ui/accordion';
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from '@/components/ui/dropdown-menu';
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from '@/components/ui/dialog';
 import { useToast } from '@/hooks/use-toast';
 import Link from 'next/link';
 import { Separator } from '@/components/ui/separator';
+import { processCourseMaterial, type AiStudyGuideMaterialInput } from '@/ai/flows/ai-study-guide-material-flow';
+import ReactMarkdown from 'react-markdown';
+import { ScrollArea } from '@/components/ui/scroll-area';
+
 
 interface StudentCourseWithMaterials {
   registration: Registration;
@@ -38,6 +43,12 @@ export default function StudyGuideAndMaterialsPage() {
   
   const [isLoadingMaterials, setIsLoadingMaterials] = useState(true);
   const [groupedCoursesBySemester, setGroupedCoursesBySemester] = useState<SemesterGroupedCourses[]>([]);
+
+  const [isAiMaterialActionLoading, setIsAiMaterialActionLoading] = useState(false);
+  const [aiMaterialActionResult, setAiMaterialActionResult] = useState<string | null>(null);
+  const [aiMaterialActionTitle, setAiMaterialActionTitle] = useState<string | null>(null);
+  const [isAiResultDialogOpen, setIsAiResultDialogOpen] = useState(false);
+
 
   useEffect(() => {
     if (user && user.role !== 'Student') {
@@ -80,12 +91,61 @@ export default function StudyGuideAndMaterialsPage() {
     }
   }, [user, router]);
 
-  const handleAiAction = (action: string, materialTitle: string) => {
-    toast({
-      title: `AI Action (Mock): ${action}`,
-      description: `Performing "${action}" on material "${materialTitle}". This would call an AI flow.`,
-    });
+  const handleMockDownload = (filePath: string | null | undefined, materialTitle: string) => {
+    if (!filePath) {
+      toast({ variant: 'destructive', title: 'Download Error', description: 'File path is missing.' });
+      return;
+    }
+    toast({ title: 'Mock Download Initiated', description: `Simulating download for: ${materialTitle}` });
+    // Simulate browser download
+    const link = document.createElement('a');
+    link.href = filePath; // In a real app, this would be an actual URL to the file
+    link.setAttribute('download', materialTitle.replace(/[^a-zA-Z0-9_.-]/g, '_') + '.pdf'); // Sanitize filename
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
   };
+
+  const handleAiMaterialAction = async (
+    actionType: 'Summarize' | 'GenerateQuestions' | 'ExplainDetails',
+    material: CourseMaterial,
+    courseName: string | undefined
+  ) => {
+    if (!courseName) {
+      toast({ variant: 'destructive', title: 'Error', description: 'Course name is missing for AI action.' });
+      return;
+    }
+
+    setIsAiMaterialActionLoading(true);
+    setAiMaterialActionResult(null);
+    setIsAiResultDialogOpen(true);
+    let dialogTitle = '';
+    switch (actionType) {
+        case 'Summarize': dialogTitle = `AI Summary for "${material.title}"`; break;
+        case 'GenerateQuestions': dialogTitle = `AI Questions for "${material.title}"`; break;
+        case 'ExplainDetails': dialogTitle = `AI Explanation for "${material.title}"`; break;
+    }
+    setAiMaterialActionTitle(dialogTitle);
+
+    try {
+      const input: AiStudyGuideMaterialInput = {
+        materialTitle: material.title,
+        materialDescription: material.description || '',
+        courseName: courseName,
+        actionType: actionType,
+      };
+      const result = await processCourseMaterial(input);
+      setAiMaterialActionResult(result.generatedText);
+      toast({ title: 'AI Processing Complete', description: `${actionType} action finished for "${material.title}".` });
+    } catch (error) {
+      console.error(`AI ${actionType} failed:`, error);
+      setAiMaterialActionResult('Sorry, I was unable to process this material at the moment. Please try again.');
+      toast({ variant: 'destructive', title: `AI ${actionType} Failed`, description: 'Could not process material. Please try again.' });
+    } finally {
+      setIsAiMaterialActionLoading(false);
+    }
+  };
+
 
   if (!user || user.role !== 'Student') {
      return (
@@ -105,12 +165,10 @@ export default function StudyGuideAndMaterialsPage() {
         icon={Layers}
       />
       
-      {/* AI Study Guide Generator Section */}
       <StudyGuideGeneratorForm />
 
       <Separator className="my-8" />
 
-      {/* My Course Materials Section */}
       <div>
         <h2 className="text-2xl font-bold tracking-tight text-foreground font-headline mb-4">My Course Materials</h2>
         {isLoadingMaterials ? (
@@ -159,7 +217,7 @@ export default function StudyGuideAndMaterialsPage() {
                                     </div>
                                     <div className="flex items-center gap-1 shrink-0">
                                       {material.material_type === 'File' && (
-                                        <Button variant="outline" size="sm" onClick={() => toast({title: "Mock Download", description: `Would download ${material.file_path}`})}>
+                                        <Button variant="outline" size="sm" onClick={() => handleMockDownload(material.file_path, material.title)}>
                                           <Download className="h-4 w-4"/>
                                         </Button>
                                       )}
@@ -176,13 +234,13 @@ export default function StudyGuideAndMaterialsPage() {
                                           </Button>
                                         </DropdownMenuTrigger>
                                         <DropdownMenuContent align="end">
-                                          <DropdownMenuItem onClick={() => handleAiAction('Summarize', material.title)}>
+                                          <DropdownMenuItem onClick={() => handleAiMaterialAction('Summarize', material, courseItem.courseDetails?.title)}>
                                             <Combine className="mr-2 h-4 w-4" /> Summarize
                                           </DropdownMenuItem>
-                                          <DropdownMenuItem onClick={() => handleAiAction('Generate Questions', material.title)}>
+                                          <DropdownMenuItem onClick={() => handleAiMaterialAction('GenerateQuestions', material, courseItem.courseDetails?.title)}>
                                             <MessageSquareQuote className="mr-2 h-4 w-4" /> Generate Questions
                                           </DropdownMenuItem>
-                                          <DropdownMenuItem onClick={() => handleAiAction('Explain Details', material.title)}>
+                                          <DropdownMenuItem onClick={() => handleAiMaterialAction('ExplainDetails', material, courseItem.courseDetails?.title)}>
                                             <HelpCircle className="mr-2 h-4 w-4" /> Explain Details
                                           </DropdownMenuItem>
                                         </DropdownMenuContent>
@@ -213,6 +271,54 @@ export default function StudyGuideAndMaterialsPage() {
           </Card>
         )}
       </div>
+
+      <Dialog open={isAiResultDialogOpen} onOpenChange={setIsAiResultDialogOpen}>
+        <DialogContent className="sm:max-w-lg">
+          <DialogHeader>
+            <DialogTitle className="text-xl font-headline">{aiMaterialActionTitle || 'AI Result'}</DialogTitle>
+            <DialogDescription>
+              Here's what the AI generated based on your request for the material.
+            </DialogDescription>
+          </DialogHeader>
+          <ScrollArea className="max-h-[60vh] mt-4 pr-5">
+            {isAiMaterialActionLoading ? (
+              <div className="flex items-center justify-center py-8">
+                <Loader2 className="h-8 w-8 animate-spin text-primary" />
+                <p className="ml-2 text-muted-foreground">AI is thinking...</p>
+              </div>
+            ) : (
+              aiMaterialActionResult && (
+                <ReactMarkdown 
+                  className="prose prose-sm dark:prose-invert max-w-none"
+                  components={{
+                    h1: ({node, ...props}) => <h1 className="text-xl font-bold my-3 font-headline" {...props} />,
+                    h2: ({node, ...props}) => <h2 className="text-lg font-semibold my-2 font-headline" {...props} />,
+                    h3: ({node, ...props}) => <h3 className="text-md font-semibold my-1 font-headline" {...props} />,
+                    p: ({node, ...props}) => <p className="mb-2 leading-relaxed" {...props} />,
+                    ul: ({node, ...props}) => <ul className="list-disc pl-5 mb-2" {...props} />,
+                    ol: ({node, ...props}) => <ol className="list-decimal pl-5 mb-2" {...props} />,
+                    li: ({node, ...props}) => <li className="mb-1" {...props} />,
+                    code: ({node, inline, className, children, ...props}) => {
+                      const match = /language-(\w+)/.exec(className || '')
+                      return !inline && match ? (
+                        <pre className="bg-gray-100 dark:bg-gray-800 p-2 rounded my-2 overflow-x-auto"><code className={className} {...props}>{children}</code></pre>
+                      ) : (
+                        <code className="bg-gray-100 dark:bg-gray-800 px-1 py-0.5 rounded text-sm" {...props}>{children}</code>
+                      )
+                    }
+                  }}
+                >
+                  {aiMaterialActionResult}
+                </ReactMarkdown>
+              )
+            )}
+          </ScrollArea>
+          <div className="flex justify-end pt-4">
+            <Button variant="outline" onClick={() => setIsAiResultDialogOpen(false)}>Close</Button>
+          </div>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }
+
