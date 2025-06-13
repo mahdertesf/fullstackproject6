@@ -1,12 +1,14 @@
+
 'use client';
 
 import { useParams } from 'next/navigation';
 import PageHeader from '@/components/shared/PageHeader';
 import CourseDetailsView from '@/components/courses/CourseDetailsView';
-import { mockCourses, mockDepartments, mockPrerequisites, mockScheduledCourses, mockTeachers, mockSemesters, mockRooms, mockBuildings } from '@/lib/data';
+import { mockCourses, mockDepartments, mockPrerequisites, mockScheduledCourses, mockUserProfiles, mockSemesters, mockRooms, mockBuildings } from '@/lib/data';
 import { ArrowLeft, BookOpen } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import Link from 'next/link';
+import type { UserProfile } from '@/types';
 
 export default function CourseDetailsPage() {
   const params = useParams();
@@ -42,12 +44,14 @@ export default function CourseDetailsPage() {
   const exampleScheduledCourse = mockScheduledCourses.find(sc => sc.course_id === course.course_id);
   let scheduledInfo;
   if (exampleScheduledCourse) {
-      const teacher = mockTeachers.find(t => t.teacher_id === exampleScheduledCourse.teacher_id);
+      // Find teacher from mockUserProfiles as UserProfile type includes teacher names
+      const teacher = mockUserProfiles.find(u => u.user_id === exampleScheduledCourse.teacher_id && u.role === 'Teacher') as UserProfile | undefined;
       const semester = mockSemesters.find(s => s.semester_id === exampleScheduledCourse.semester_id);
-      const room = mockRooms.find(r => r.room_id === exampleScheduledCourse.room_id);
-      const building = room ? mockBuildings.find(b => b.building_id === room.building_id) : undefined;
+      const room = exampleScheduledCourse.room_id ? mockRooms.find(r => r.room_id === exampleScheduledCourse.room_id) : undefined;
+      const building = room?.building_id ? mockBuildings.find(b => b.building_id === room.building_id) : undefined;
+      
       scheduledInfo = {
-          teacher,
+          teacher, // This will now be a UserProfile object or undefined
           semester,
           days_of_week: exampleScheduledCourse.days_of_week,
           start_time: exampleScheduledCourse.start_time,

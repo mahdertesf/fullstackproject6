@@ -1,16 +1,16 @@
-import type { Course, Department, Prerequisite, Teacher, Semester } from '@/types';
+
+import type { Course, Department, Prerequisite, UserProfile, Semester } from '@/types'; // Changed Teacher to UserProfile
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { BookText, Tag, Users, CalendarDays, Link2, Clock, MapPin } from 'lucide-react';
-import { mockTeachers, mockSemesters, mockCourses as allMockCourses } from '@/lib/data'; // For prerequisites example
+import { mockCourses as allMockCourses } from '@/lib/data'; // For prerequisites example
 
 interface CourseDetailsViewProps {
   course: Course & { 
     department?: Department;
-    prerequisites?: (Prerequisite & { prerequisiteCourse?: Course })[]; // Assuming prerequisites are fetched
-    // Add scheduled course info if this page is for a specific offering
+    prerequisites?: (Prerequisite & { prerequisiteCourse?: Course })[];
     scheduledInfo?: {
-        teacher?: Teacher;
+        teacher?: UserProfile; // Changed from Teacher to UserProfile
         semester?: Semester;
         days_of_week?: string | null;
         start_time?: string | null;
@@ -30,7 +30,6 @@ const formatTime = (timeString: string | null | undefined) => {
 };
 
 export default function CourseDetailsView({ course }: CourseDetailsViewProps) {
-  // Example: Find prerequisite details
   const prerequisitesDetails = course.prerequisites?.map(prereq => {
     const prereqCourse = allMockCourses.find(c => c.course_id === prereq.prerequisite_course_id);
     return prereqCourse ? `${prereqCourse.course_code} - ${prereqCourse.title}` : 'Unknown Prerequisite';

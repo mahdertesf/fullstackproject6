@@ -22,7 +22,7 @@ export interface Department {
 }
 
 export interface Student {
-  student_id: number;
+  student_id: number; // This is the foreign key to User.user_id
   first_name: string;
   last_name: string;
   date_of_birth?: string | null;
@@ -36,7 +36,7 @@ export interface Student {
 }
 
 export interface Teacher {
-  teacher_id: number;
+  teacher_id: number; // This is the foreign key to User.user_id
   first_name: string;
   last_name: string;
   department_id: number;
@@ -48,7 +48,7 @@ export interface Teacher {
 }
 
 export interface Staff {
-  staff_id: number;
+  staff_id: number; // This is the foreign key to User.user_id
   first_name: string;
   last_name: string;
   job_title?: string | null;
@@ -117,7 +117,7 @@ export interface ScheduledCourse {
   scheduled_course_id: number;
   course_id: number;
   semester_id: number;
-  teacher_id: number;
+  teacher_id: number; // This corresponds to UserProfile.user_id for a teacher
   room_id?: number | null;
   section_number: string;
   max_capacity: number;
@@ -129,7 +129,7 @@ export interface ScheduledCourse {
   updated_at: string;
   course?: Course; // Optional
   semester?: Semester; // Optional
-  teacher?: UserProfile; // Optional - Changed to UserProfile for consistency
+  teacher?: UserProfile; 
   room?: Room; // Optional
 }
 
@@ -137,7 +137,7 @@ export type RegistrationStatus = 'Registered' | 'Dropped' | 'Completed' | 'Waitl
 
 export interface Registration {
   registration_id: number;
-  student_id: number;
+  student_id: number; // Corresponds to UserProfile.user_id for a student
   scheduled_course_id: number;
   registration_date: string;
   status: RegistrationStatus;
@@ -161,7 +161,7 @@ export interface CourseMaterial {
   material_type: MaterialType;
   file_path?: string | null;
   url?: string | null;
-  uploaded_by: number; 
+  uploaded_by: number; // Corresponds to UserProfile.user_id for a teacher
   upload_timestamp: string;
   scheduledCourse?: ScheduledCourse; 
   uploader?: UserProfile; 
@@ -169,7 +169,7 @@ export interface CourseMaterial {
 
 export interface AuditLog {
   log_id: number;
-  user_id?: number | null;
+  user_id?: number | null; // Corresponds to UserProfile.user_id
   action_type: string;
   target_entity_type?: string | null;
   target_entity_id?: string | null;
@@ -188,7 +188,7 @@ export interface Announcement {
   announcement_id: number;
   title: string;
   content: string;
-  author_id: number;
+  author_id: number; // Corresponds to UserProfile.user_id
   target_audience: AnnouncementTargetAudience;
   desired_tone?: AnnouncementTone | null;
   status: AnnouncementStatus;
@@ -204,12 +204,14 @@ export interface Announcement {
   target_section_ids?: number[]; // For teacher announcements to specific sections
 }
 
-// Combined user profile type for easier handling in profile page
-export type UserProfile = User & Partial<Omit<Student, 'student_id'|'department_id'|'enrollment_date'|'updated_at'>> & Partial<Omit<Teacher, 'teacher_id'|'department_id'|'updated_at'>> & Partial<Omit<Staff, 'staff_id'|'updated_at'>> & {
-  isSuperAdmin?: boolean;
-  profile_picture_url?: string;
-  department_id?: number; 
-  enrollment_date?: string;
+// Combined user profile type for easier handling in profile page and relationships
+// It merges the base User with role-specific details.
+// The 'student_id', 'teacher_id', 'staff_id' from original role tables are now effectively 'user_id'.
+export type UserProfile = User & Partial<Omit<Student, 'student_id' | 'user' | 'department'>> & Partial<Omit<Teacher, 'teacher_id' | 'user' | 'department'>> & Partial<Omit<Staff, 'staff_id' | 'user'>> & {
+  isSuperAdmin?: boolean; // Specific flag for the main admin
+  profile_picture_url?: string; // Centralized profile picture
+  // department_id might be present if student/teacher; already in Student/Teacher types
+  // enrollment_date for students; already in Student type
 };
 
 
@@ -237,15 +239,14 @@ export interface StudentAssessmentScore {
 
 // Helper type for enriched registration data used in frontend components
 export interface EnrichedRegistration extends Registration {
-  studentProfile?: UserProfile;
-  courseDetails?: Course;
-  semesterDetails?: Semester;
-  assessments?: (Assessment & { studentScore?: StudentAssessmentScore })[];
-  materials?: CourseMaterial[];
+  studentProfile?: UserProfile; // The student user profile
+  courseDetails?: Course; // Details of the course itself
+  semesterDetails?: Semester; // Details of the semester
+  assessments?: (Assessment & { studentScore?: StudentAssessmentScore })[]; // Assessments for the scheduled course with student's score
+  materials?: CourseMaterial[]; // Course materials for this scheduled course
 }
 
 export interface TeacherSectionInfo {
   id: string; // scheduled_course_id
   name: string; // e.g., "SE301 - S1 (Spring 2024)"
 }
-
