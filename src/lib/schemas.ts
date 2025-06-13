@@ -20,13 +20,25 @@ export const StudyGuideGeneratorSchema = z.object({
 });
 export type StudyGuideGeneratorFormData = z.infer<typeof StudyGuideGeneratorSchema>;
 
-// Add more schemas as needed for other forms: Profile, Course Creation, etc.
 export const UserProfileSchema = z.object({
   email: z.string().email().optional(),
   phone_number: z.string().optional(),
   address: z.string().optional(),
   office_location: z.string().optional(), // For teachers
   job_title: z.string().optional(), // For staff
-  // Add other common fields or use discriminated unions for role-specific fields
 });
 export type UserProfileFormData = z.infer<typeof UserProfileSchema>;
+
+export const NewUserSchema = z.object({
+  username: z.string().min(3, "Username must be at least 3 characters."),
+  email: z.string().email("Invalid email address."),
+  firstName: z.string().optional(),
+  lastName: z.string().optional(),
+  role: z.enum(['Student', 'Teacher', 'Staff'], { required_error: "Role is required." }),
+  password: z.string().min(6, "Password must be at least 6 characters."),
+  confirmPassword: z.string().min(6, "Confirm password must be at least 6 characters."),
+}).refine(data => data.password === data.confirmPassword, {
+  message: "Passwords don't match",
+  path: ["confirmPassword"], // Path to field to display error
+});
+export type NewUserFormData = z.infer<typeof NewUserSchema>;

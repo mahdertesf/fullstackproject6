@@ -8,23 +8,31 @@ import { Input } from '@/components/ui/input';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from '@/components/ui/dropdown-menu';
-import { Card } from '@/components/ui/card'; // Added Card import
-import { mockUserProfiles } from '@/lib/data';
+import { Card } from '@/components/ui/card';
+import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog';
+import { mockUserProfiles, mockUsers } from '@/lib/data'; // Ensure mockUsers is available if needed for adding
 import type { UserProfile, UserRole } from '@/types';
-import { Users, Edit, Trash2, PlusCircle, Search, Filter, MoreHorizontal, ShieldAlert } from 'lucide-react';
+import { Users, Edit, Trash2, PlusCircle, Search, Filter, MoreHorizontal, ShieldAlert, Loader2 } from 'lucide-react';
 import { useAuthStore } from '@/store/authStore';
 import { useRouter } from 'next/navigation';
 import { Badge } from '@/components/ui/badge';
+import AddUserForm from '@/components/users/AddUserForm';
+import { NewUserFormData } from '@/lib/schemas';
+import { useToast } from '@/hooks/use-toast';
 
-const ITEMS_PER_PAGE = 10; // Example, can be adjusted
+const ITEMS_PER_PAGE = 10;
 
 export default function UserManagementPage() {
   const { user } = useAuthStore();
   const router = useRouter();
+  const { toast } = useToast();
 
   const [searchTerm, setSearchTerm] = useState('');
   const [selectedRole, setSelectedRole] = useState<UserRole | 'all'>('all');
-  const [currentPage, setCurrentPage] = useState(1); // For future pagination
+  const [currentPage, setCurrentPage] = useState(1);
+  const [isAddUserDialogOpen, setIsAddUserDialogOpen] = useState(false);
+  const [isSubmitting, setIsSubmitting] = useState(false);
+  const [usersList, setUsersList] = useState<UserProfile[]>(mockUserProfiles);
 
   useEffect(() => {
     if (user && user.role !== 'Staff' && !user.isSuperAdmin) {
@@ -33,7 +41,7 @@ export default function UserManagementPage() {
   }, [user, router]);
 
   const filteredUsers = useMemo(() => {
-    return mockUserProfiles.filter(u => {
+    return usersList.filter(u => {
       const searchLower = searchTerm.toLowerCase();
       const matchesSearch =
         u.username.toLowerCase().includes(searchLower) ||
@@ -43,16 +51,14 @@ export default function UserManagementPage() {
 
       const matchesRole = selectedRole === 'all' ? true : u.role === selectedRole;
       
-      // SuperAdmins can see all users, Staff can see Students and Teachers
       if (user?.isSuperAdmin) return matchesSearch && matchesRole;
       if (user?.role === 'Staff') {
         return matchesSearch && matchesRole && (u.role === 'Student' || u.role === 'Teacher');
       }
-      return false; // Should be caught by useEffect redirect
+      return false; 
     });
-  }, [searchTerm, selectedRole, user]);
+  }, [searchTerm, selectedRole, user, usersList]);
 
-  // Basic pagination (can be expanded)
   const paginatedUsers = filteredUsers.slice(
     (currentPage - 1) * ITEMS_PER_PAGE,
     currentPage * ITEMS_PER_PAGE
@@ -60,12 +66,42 @@ export default function UserManagementPage() {
 
   const handleEditUser = (userId: number) => {
     console.log(`Edit user: ${userId}`);
-    // Implement edit functionality, e.g., navigate to an edit page or open a modal
+    toast({ title: 'Edit User (Not Implemented)', description: `Functionality to edit user ${userId} is not yet implemented.` });
   };
 
   const handleDeleteUser = (userId: number) => {
     console.log(`Delete user: ${userId}`);
-    // Implement delete functionality with confirmation
+    toast({ title: 'Delete User (Not Implemented)', description: `Functionality to delete user ${userId} is not yet implemented.` });
+  };
+
+  const handleAddNewUser = async (data: NewUserFormData) => {
+    setIsSubmitting(true);
+    console.log("New user data:", data);
+    // Mock adding user
+    await new Promise(resolve => setTimeout(resolve, 1000)); 
+    
+    // This is a mock addition. In a real app, you'd get the new user_id from the backend.
+    const newUserId = Math.max(...mockUsers.map(u => u.user_id), 0) + 1;
+    const newUserProfile: UserProfile = {
+      user_id: newUserId,
+      username: data.username,
+      email: data.email,
+      role: data.role,
+      first_name: data.firstName,
+      last_name: data.lastName,
+      is_active: true, // Default to active
+      password_hash: 'mock_hash', // Mock
+      created_at: new Date().toISOString(),
+      updated_at: new Date().toISOString(),
+    };
+    setUsersList(prev => [...prev, newUserProfile]);
+    
+    toast({
+      title: 'User Created (Mock)',
+      description: `User ${data.username} has been created.`,
+    });
+    setIsSubmitting(false);
+    setIsAddUserDialogOpen(false);
   };
   
   if (!user || (user.role !== 'Staff' && !user.isSuperAdmin)) {
@@ -85,9 +121,27 @@ export default function UserManagementPage() {
         description="Manage student and teacher accounts."
         icon={Users}
         action={
-          <Button>
-            <PlusCircle className="mr-2 h-4 w-4" /> Add New User
-          </Button>
+          <Dialog open={isAddUserDialogOpen} onOpenChange={setIsAddUserDialogOpen}>
+            <DialogTrigger asChild>
+              <Button>
+                <PlusCircle className="mr-2 h-4 w-4" /> Add New User
+              </Button>
+            </DialogTrigger>
+            <DialogContent className="sm:max-w-[600px]">
+              <DialogHeader>
+                <DialogTitle>Add New User</DialogTitle>
+                <DialogDescription>
+                  Fill in the details to create a new user account.
+                </DialogDescription>
+              </DialogHeader>
+              <AddUserForm
+                onSubmit={handleAddNewUser}
+                onCancel={() => setIsAddUserDialogOpen(false)}
+                availableRoles={user?.isSuperAdmin ? ['Student', 'Teacher', 'Staff'] : ['Student', 'Teacher']}
+                isSubmitting={isSubmitting}
+              />
+            </DialogContent>
+          </Dialog>
         }
       />
 
@@ -185,7 +239,6 @@ export default function UserManagementPage() {
           </TableBody>
         </Table>
       </Card>
-      {/* Basic Pagination (can be improved) */}
       {filteredUsers.length > ITEMS_PER_PAGE && (
         <div className="flex justify-center mt-4">
           <Button
@@ -210,4 +263,3 @@ export default function UserManagementPage() {
     </div>
   );
 }
-
