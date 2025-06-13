@@ -20,7 +20,6 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { Edit3, ShieldAlert, CheckCircle, XCircle, AlertTriangle, Info } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
 import Link from 'next/link';
-import { FormLabel } from '@/components/ui/form'; // Added import
 
 interface AvailableCourseForRegistration extends ScheduledCourse {
   courseDetails?: Course;
@@ -225,7 +224,7 @@ export default function StudentCourseRegistrationPage() {
 
       <Card>
         <CardHeader>
-            <FormLabel>Select Semester for Registration</FormLabel>
+            <p className="text-sm font-medium text-foreground mb-1">Select Semester for Registration</p>
             <Select value={selectedSemesterId} onValueChange={setSelectedSemesterId}>
               <SelectTrigger className="w-full md:w-1/3">
                 <SelectValue placeholder="Select a semester" />
