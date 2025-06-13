@@ -10,7 +10,7 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from '@/components/ui/dropdown-menu';
 import { Card } from '@/components/ui/card';
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog';
-import { mockUserProfiles, mockUsers } from '@/lib/data'; 
+import { mockUserProfiles } from '@/lib/data';
 import type { UserProfile, UserRole } from '@/types';
 import { Users, Edit, Trash2, PlusCircle, Search, Filter, MoreHorizontal, ShieldAlert, Loader2 } from 'lucide-react';
 import { useAuthStore } from '@/store/authStore';
@@ -125,6 +125,8 @@ export default function UserManagementPage() {
 
   const handleDeleteUser = (userId: number) => {
     const userToDelete = usersList.find(u => u.user_id === userId);
+    if (!userToDelete) return;
+
     if (user?.role === 'Staff' && !user.isSuperAdmin && userToDelete?.role === 'Staff') {
          toast({ variant: 'destructive', title: 'Permission Denied', description: 'Staff cannot delete other Staff accounts.' });
          return;
@@ -138,10 +140,10 @@ export default function UserManagementPage() {
         return;
     }
 
-    console.log(`Delete user: ${userId}`);
-    // Mock deletion:
-    // setUsersList(prev => prev.filter(u => u.user_id !== userId));
-    toast({ title: 'Delete User (Not Implemented)', description: `Functionality to delete user ${userId} is not yet fully implemented. Mocked.` });
+    console.log(`Attempting to delete user: ${userId}`);
+    // Mock deletion by filtering out the user from the list
+    setUsersList(prev => prev.filter(u => u.user_id !== userId));
+    toast({ title: 'User Deleted (Mock)', description: `User ${userToDelete.username} has been removed from the list.` });
   };
 
   const handleAddNewUser = async (data: NewUserFormData) => {
@@ -158,12 +160,12 @@ export default function UserManagementPage() {
       first_name: data.firstName,
       last_name: data.lastName,
       is_active: true, 
-      password_hash: 'mock_hash', 
+      password_hash: 'mock_hash', // In a real app, this would be securely hashed
       created_at: new Date().toISOString(),
       updated_at: new Date().toISOString(),
       isSuperAdmin: data.role === 'Staff' ? false : undefined, // Staff cannot create super admins
     };
-    setUsersList(prev => [...prev, newUserProfile]);
+    setUsersList(prev => [newUserProfile, ...prev]); // Add to the beginning for visibility
     
     toast({
       title: 'User Created (Mock)',
@@ -183,7 +185,9 @@ export default function UserManagementPage() {
     );
   }
   
+  // Staff can add Students and Teachers. SuperAdmins can add Staff too.
   const availableRolesForNewUser: UserRole[] = user.isSuperAdmin ? ['Student', 'Teacher', 'Staff'] : ['Student', 'Teacher'];
+  // Staff can edit Students and Teachers. SuperAdmins can edit Staff too (except demoting other super admins easily).
   const availableRolesForEdit: UserRole[] = user.isSuperAdmin ? ['Student', 'Teacher', 'Staff'] : ['Student', 'Teacher'];
 
 
@@ -204,7 +208,7 @@ export default function UserManagementPage() {
               <DialogHeader>
                 <DialogTitle>Add New User</DialogTitle>
                 <DialogDescription>
-                  Fill in the details to create a new user account. Staff can create Student or Teacher roles.
+                  Fill in the details to create a new user account. {user.isSuperAdmin ? "Admins can create Staff roles." : "Staff can create Student or Teacher roles."}
                 </DialogDescription>
               </DialogHeader>
               <AddUserForm
@@ -285,7 +289,12 @@ export default function UserManagementPage() {
                   <TableCell className="text-right">
                     <DropdownMenu>
                       <DropdownMenuTrigger asChild>
-                        <Button variant="ghost" size="icon" disabled={u.isSuperAdmin && !user?.isSuperAdmin && user?.user_id !== u.user_id}>
+                        {/* Disable actions if the target user is a SuperAdmin AND the current user is NOT a SuperAdmin OR it's a different SuperAdmin */}
+                        <Button 
+                          variant="ghost" 
+                          size="icon" 
+                          disabled={u.isSuperAdmin && (!user?.isSuperAdmin || (user?.isSuperAdmin && user?.user_id !== u.user_id))}
+                        >
                           <MoreHorizontal className="h-4 w-4" />
                           <span className="sr-only">Actions</span>
                         </Button>
@@ -293,6 +302,8 @@ export default function UserManagementPage() {
                       <DropdownMenuContent align="end">
                         <DropdownMenuItem 
                             onClick={() => handleOpenEditDialog(u)}
+                            // Staff cannot edit other Staff or SuperAdmins.
+                            // SuperAdmins can edit anyone, but cannot demote other SuperAdmins (handled in EditUserForm logic)
                             disabled={(user?.role === 'Staff' && !user?.isSuperAdmin && (u.role === 'Staff' || u.isSuperAdmin))}
                         >
                           <Edit className="mr-2 h-4 w-4" /> Edit
@@ -300,6 +311,8 @@ export default function UserManagementPage() {
                         <DropdownMenuItem 
                             onClick={() => handleDeleteUser(u.user_id)} 
                             className="text-destructive focus:text-destructive focus:bg-destructive/10"
+                            // Staff cannot delete other Staff or SuperAdmins.
+                            // SuperAdmins cannot delete themselves.
                             disabled={ (user?.role === 'Staff' && !user?.isSuperAdmin && (u.role === 'Staff' || u.isSuperAdmin)) || (u.isSuperAdmin && u.user_id === user?.user_id) }
                         >
                           <Trash2 className="mr-2 h-4 w-4" /> Delete
