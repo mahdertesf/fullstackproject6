@@ -31,7 +31,7 @@ import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from '@/
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { Badge } from '@/components/ui/badge';
 import { GraduationCap, BookOpenText, FileText, Link as LinkIcon, Download, ShieldAlert, Activity, ChevronDown, ChevronUp } from 'lucide-react';
-import { calculateCGPA, calculateSGPA } from '@/lib/gpaUtils';
+import { calculateCGPA, calculateSGPA, getGradePointForLetter } from '@/lib/gpaUtils';
 import { ScrollArea } from '@/components/ui/scroll-area';
 import Link from 'next/link';
 import { useToast } from '@/hooks/use-toast';
