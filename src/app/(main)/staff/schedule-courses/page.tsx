@@ -6,10 +6,11 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from '@/components/ui/dropdown-menu';
+import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog';
 import { useAuthStore } from '@/store/authStore';
 import { useRouter } from 'next/navigation';
 import { useEffect, useState, useMemo } from 'react';
-import { Edit3, ShieldAlert, PlusCircle, MoreHorizontal, Edit, Trash2 } from 'lucide-react';
+import { Edit3, ShieldAlert, PlusCircle, MoreHorizontal, Edit, Trash2, Loader2 } from 'lucide-react';
 import { mockScheduledCourses, mockCourses, mockTeachers, mockSemesters, mockRooms, mockBuildings } from '@/lib/data';
 import type { ScheduledCourse, Course, Teacher, Semester, Room, Building } from '@/types';
 import { useToast } from '@/hooks/use-toast';
@@ -32,8 +33,13 @@ export default function ScheduleCoursesPage() {
   const { toast } = useToast();
 
   const [currentPage, setCurrentPage] = useState(1);
-  // In a real app, this would be fetched from a backend
   const [scheduledCoursesList, setScheduledCoursesList] = useState<ScheduledCourse[]>(mockScheduledCourses);
+  
+  const [isAddDialogOpen, setIsAddDialogOpen] = useState(false);
+  const [isEditDialogOpen, setIsEditDialogOpen] = useState(false);
+  const [selectedScheduledCourse, setSelectedScheduledCourse] = useState<EnrichedScheduledCourse | null>(null);
+  const [isSubmittingDialog, setIsSubmittingDialog] = useState(false);
+
 
   useEffect(() => {
     if (user && user.role !== 'Staff' && !user.isSuperAdmin) {
@@ -73,35 +79,39 @@ export default function ScheduleCoursesPage() {
     }
   };
 
-  const handleScheduleNewCourse = () => {
-    toast({ title: 'Action Required', description: 'Schedule new course form to be implemented.' });
-    // Example: setIsScheduleDialogOpen(true); // When dialog and form component are ready
-  };
-
-  const handleEditScheduledCourse = (id: number) => {
-    toast({ title: 'Action Required', description: `Edit form for scheduled course ${id} to be implemented.` });
-    // Example: 
-    // const courseToEdit = scheduledCoursesList.find(sc => sc.scheduled_course_id === id);
-    // if (courseToEdit) {
-    //   setEditingScheduledCourse(courseToEdit); 
-    //   setIsEditDialogOpen(true); // When dialog and form component are ready
-    // }
+  const handleOpenEditDialog = (scheduledCourse: EnrichedScheduledCourse) => {
+    setSelectedScheduledCourse(scheduledCourse);
+    setIsEditDialogOpen(true);
   };
 
   const handleDeleteScheduledCourse = (id: number) => {
-    const courseToDelete = scheduledCoursesList.find(sc => sc.scheduled_course_id === id);
+    const courseToDelete = enrichedScheduledCourses.find(sc => sc.scheduled_course_id === id);
     if (courseToDelete) {
         setScheduledCoursesList(prev => prev.filter(sc => sc.scheduled_course_id !== id));
-        toast({ title: 'Scheduled Course Deleted (Mock)', description: `Scheduled course for ${courseToDelete.course?.title || 'ID: '+id} has been removed from the list.` });
+        toast({ title: 'Scheduled Course Deleted (Mock)', description: `Scheduled course for ${courseToDelete.courseName || 'ID: '+id} has been removed from the list.` });
     } else {
         toast({ variant: 'destructive', title: 'Error', description: 'Could not find the scheduled course to delete.'});
     }
   };
   
+  const handleMockDialogSubmit = async (action: 'add' | 'edit') => {
+    setIsSubmittingDialog(true);
+    await new Promise(resolve => setTimeout(resolve, 1000)); // Simulate API call
+    if (action === 'add') {
+      toast({ title: 'Schedule Submitted (Mock)', description: 'New course schedule has been notionally submitted.' });
+      setIsAddDialogOpen(false);
+    } else if (action === 'edit' && selectedScheduledCourse) {
+      toast({ title: 'Changes Saved (Mock)', description: `Changes for ${selectedScheduledCourse.courseName} have been notionally saved.` });
+      setIsEditDialogOpen(false);
+      setSelectedScheduledCourse(null);
+    }
+    setIsSubmittingDialog(false);
+  };
+
   const formatTime = (timeString: string | null | undefined) => {
     if (!timeString) return 'N/A';
     // Check if timeString is already in hh:mm a format from previous processing or if it's HH:mm:ss
-    if (timeString.includes('AM') || timeString.includes('PM')) return timeString;
+    if (timeString.match(/(\d{1,2}:\d{2}\s*(AM|PM))/i)) return timeString;
 
     const [hours, minutes] = timeString.split(':');
     if (isNaN(parseInt(hours)) || isNaN(parseInt(minutes))) return 'Invalid Time';
@@ -128,9 +138,34 @@ export default function ScheduleCoursesPage() {
         description="Manage course schedules for upcoming semesters."
         icon={Edit3}
         action={
-          <Button onClick={handleScheduleNewCourse}>
-            <PlusCircle className="mr-2 h-4 w-4" /> Schedule New Course
-          </Button>
+          <Dialog open={isAddDialogOpen} onOpenChange={setIsAddDialogOpen}>
+            <DialogTrigger asChild>
+              <Button>
+                <PlusCircle className="mr-2 h-4 w-4" /> Schedule New Course
+              </Button>
+            </DialogTrigger>
+            <DialogContent className="sm:max-w-md">
+              <DialogHeader>
+                <DialogTitle>Schedule New Course</DialogTitle>
+                <DialogDescription>
+                  The form to schedule a new course with all relevant details (course, teacher, semester, room, time, etc.) will be implemented here.
+                </DialogDescription>
+              </DialogHeader>
+              {/* Placeholder for AddScheduleForm */}
+              <div className="py-4 text-center text-muted-foreground">
+                (Add Schedule Form will appear here)
+              </div>
+              <DialogFooter>
+                <Button variant="outline" onClick={() => setIsAddDialogOpen(false)} disabled={isSubmittingDialog}>
+                  Cancel
+                </Button>
+                <Button onClick={() => handleMockDialogSubmit('add')} disabled={isSubmittingDialog}>
+                  {isSubmittingDialog && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
+                  Submit (Mock)
+                </Button>
+              </DialogFooter>
+            </DialogContent>
+          </Dialog>
         }
       />
       
@@ -179,7 +214,7 @@ export default function ScheduleCoursesPage() {
                           </Button>
                         </DropdownMenuTrigger>
                         <DropdownMenuContent align="end">
-                          <DropdownMenuItem onClick={() => handleEditScheduledCourse(sc.scheduled_course_id)}>
+                          <DropdownMenuItem onClick={() => handleOpenEditDialog(sc)}>
                             <Edit className="mr-2 h-4 w-4" /> Edit
                           </DropdownMenuItem>
                           <DropdownMenuItem onClick={() => handleDeleteScheduledCourse(sc.scheduled_course_id)} className="text-destructive focus:text-destructive focus:bg-destructive/10">
@@ -224,9 +259,34 @@ export default function ScheduleCoursesPage() {
         </div>
       )}
       
-      {/* Dialogs for Schedule New/Edit will go here when fully implemented */}
-
+      {selectedScheduledCourse && (
+        <Dialog open={isEditDialogOpen} onOpenChange={(isOpen) => {
+          setIsEditDialogOpen(isOpen);
+          if (!isOpen) setSelectedScheduledCourse(null);
+        }}>
+          <DialogContent className="sm:max-w-md">
+            <DialogHeader>
+              <DialogTitle>Edit Scheduled Course: {selectedScheduledCourse.courseName}</DialogTitle>
+              <DialogDescription>
+                The form to edit this scheduled course (ID: {selectedScheduledCourse.scheduled_course_id}) will be implemented here.
+              </DialogDescription>
+            </DialogHeader>
+            {/* Placeholder for EditScheduleForm */}
+            <div className="py-4 text-center text-muted-foreground">
+              (Edit Schedule Form will appear here for {selectedScheduledCourse.courseCode} - {selectedScheduledCourse.courseName})
+            </div>
+            <DialogFooter>
+              <Button variant="outline" onClick={() => { setIsEditDialogOpen(false); setSelectedScheduledCourse(null); }} disabled={isSubmittingDialog}>
+                Cancel
+              </Button>
+              <Button onClick={() => handleMockDialogSubmit('edit')} disabled={isSubmittingDialog}>
+                {isSubmittingDialog && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
+                Save Changes (Mock)
+              </Button>
+            </DialogFooter>
+          </DialogContent>
+        </Dialog>
+      )}
     </div>
   );
 }
-
