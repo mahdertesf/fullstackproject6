@@ -10,14 +10,15 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from '@/components/ui/dropdown-menu';
 import { Card } from '@/components/ui/card';
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog';
-import { mockUserProfiles, mockUsers } from '@/lib/data'; // Ensure mockUsers is available if needed for adding
+import { mockUserProfiles, mockUsers } from '@/lib/data'; 
 import type { UserProfile, UserRole } from '@/types';
 import { Users, Edit, Trash2, PlusCircle, Search, Filter, MoreHorizontal, ShieldAlert, Loader2 } from 'lucide-react';
 import { useAuthStore } from '@/store/authStore';
 import { useRouter } from 'next/navigation';
 import { Badge } from '@/components/ui/badge';
 import AddUserForm from '@/components/users/AddUserForm';
-import { NewUserFormData } from '@/lib/schemas';
+import EditUserForm from '@/components/users/EditUserForm';
+import { NewUserFormData, EditUserFormData } from '@/lib/schemas';
 import { useToast } from '@/hooks/use-toast';
 
 const ITEMS_PER_PAGE = 10;
@@ -31,6 +32,8 @@ export default function UserManagementPage() {
   const [selectedRole, setSelectedRole] = useState<UserRole | 'all'>('all');
   const [currentPage, setCurrentPage] = useState(1);
   const [isAddUserDialogOpen, setIsAddUserDialogOpen] = useState(false);
+  const [isEditUserDialogOpen, setIsEditUserDialogOpen] = useState(false);
+  const [editingUser, setEditingUser] = useState<UserProfile | null>(null);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [usersList, setUsersList] = useState<UserProfile[]>(mockUserProfiles);
 
@@ -52,6 +55,7 @@ export default function UserManagementPage() {
       const matchesRole = selectedRole === 'all' ? true : u.role === selectedRole;
       
       if (user?.isSuperAdmin) return matchesSearch && matchesRole;
+      // Staff can see Students and Teachers, but not other Staff (unless they are also super admin, handled above)
       if (user?.role === 'Staff') {
         return matchesSearch && matchesRole && (u.role === 'Student' || u.role === 'Teacher');
       }
@@ -64,24 +68,88 @@ export default function UserManagementPage() {
     currentPage * ITEMS_PER_PAGE
   );
 
-  const handleEditUser = (userId: number) => {
-    console.log(`Edit user: ${userId}`);
-    toast({ title: 'Edit User (Not Implemented)', description: `Functionality to edit user ${userId} is not yet implemented.` });
+  const handleOpenEditDialog = (userToEdit: UserProfile) => {
+    if (user?.role === 'Staff' && !user?.isSuperAdmin && userToEdit.role === 'Staff') {
+        toast({
+            variant: 'destructive',
+            title: 'Permission Denied',
+            description: 'Staff users cannot edit other Staff user accounts.',
+        });
+        return;
+    }
+    if (user?.role === 'Staff' && !user?.isSuperAdmin && userToEdit.isSuperAdmin) {
+        toast({
+            variant: 'destructive',
+            title: 'Permission Denied',
+            description: 'Staff users cannot edit Super Admin accounts.',
+        });
+        return;
+    }
+    setEditingUser(userToEdit);
+    setIsEditUserDialogOpen(true);
+  };
+  
+  const handleEditUserSubmit = async (data: EditUserFormData) => {
+    if (!editingUser) return;
+    setIsSubmitting(true);
+    console.log("Editing user data:", editingUser.user_id, data);
+    
+    await new Promise(resolve => setTimeout(resolve, 1000)); // Simulate API call
+
+    setUsersList(prev => 
+      prev.map(u => 
+        u.user_id === editingUser.user_id 
+          ? { 
+              ...u, 
+              username: data.username,
+              email: data.email,
+              first_name: data.firstName,
+              last_name: data.lastName,
+              role: data.role,
+              is_active: data.is_active,
+              updated_at: new Date().toISOString(),
+            } 
+          : u
+      )
+    );
+    
+    toast({
+      title: 'User Updated (Mock)',
+      description: `User ${data.username} has been updated.`,
+    });
+    setIsSubmitting(false);
+    setIsEditUserDialogOpen(false);
+    setEditingUser(null);
   };
 
+
   const handleDeleteUser = (userId: number) => {
+    const userToDelete = usersList.find(u => u.user_id === userId);
+    if (user?.role === 'Staff' && !user.isSuperAdmin && userToDelete?.role === 'Staff') {
+         toast({ variant: 'destructive', title: 'Permission Denied', description: 'Staff cannot delete other Staff accounts.' });
+         return;
+    }
+    if (user?.role === 'Staff' && !user.isSuperAdmin && userToDelete?.isSuperAdmin) {
+        toast({ variant: 'destructive', title: 'Permission Denied', description: 'Staff cannot delete Super Admin accounts.'});
+        return;
+    }
+    if (userToDelete?.isSuperAdmin && user?.user_id === userToDelete.user_id) {
+        toast({ variant: 'destructive', title: 'Action Denied', description: 'Super Admins cannot delete their own account.'});
+        return;
+    }
+
     console.log(`Delete user: ${userId}`);
-    toast({ title: 'Delete User (Not Implemented)', description: `Functionality to delete user ${userId} is not yet implemented.` });
+    // Mock deletion:
+    // setUsersList(prev => prev.filter(u => u.user_id !== userId));
+    toast({ title: 'Delete User (Not Implemented)', description: `Functionality to delete user ${userId} is not yet fully implemented. Mocked.` });
   };
 
   const handleAddNewUser = async (data: NewUserFormData) => {
     setIsSubmitting(true);
     console.log("New user data:", data);
-    // Mock adding user
     await new Promise(resolve => setTimeout(resolve, 1000)); 
     
-    // This is a mock addition. In a real app, you'd get the new user_id from the backend.
-    const newUserId = Math.max(...mockUsers.map(u => u.user_id), 0) + 1;
+    const newUserId = Math.max(...usersList.map(u => u.user_id), 0) + 1;
     const newUserProfile: UserProfile = {
       user_id: newUserId,
       username: data.username,
@@ -89,10 +157,11 @@ export default function UserManagementPage() {
       role: data.role,
       first_name: data.firstName,
       last_name: data.lastName,
-      is_active: true, // Default to active
-      password_hash: 'mock_hash', // Mock
+      is_active: true, 
+      password_hash: 'mock_hash', 
       created_at: new Date().toISOString(),
       updated_at: new Date().toISOString(),
+      isSuperAdmin: data.role === 'Staff' ? false : undefined, // Staff cannot create super admins
     };
     setUsersList(prev => [...prev, newUserProfile]);
     
@@ -113,6 +182,10 @@ export default function UserManagementPage() {
       </div>
     );
   }
+  
+  const availableRolesForNewUser: UserRole[] = user.isSuperAdmin ? ['Student', 'Teacher', 'Staff'] : ['Student', 'Teacher'];
+  const availableRolesForEdit: UserRole[] = user.isSuperAdmin ? ['Student', 'Teacher', 'Staff'] : ['Student', 'Teacher'];
+
 
   return (
     <div className="space-y-6">
@@ -131,13 +204,13 @@ export default function UserManagementPage() {
               <DialogHeader>
                 <DialogTitle>Add New User</DialogTitle>
                 <DialogDescription>
-                  Fill in the details to create a new user account.
+                  Fill in the details to create a new user account. Staff can create Student or Teacher roles.
                 </DialogDescription>
               </DialogHeader>
               <AddUserForm
                 onSubmit={handleAddNewUser}
                 onCancel={() => setIsAddUserDialogOpen(false)}
-                availableRoles={user?.isSuperAdmin ? ['Student', 'Teacher', 'Staff'] : ['Student', 'Teacher']}
+                availableRoles={availableRolesForNewUser}
                 isSubmitting={isSubmitting}
               />
             </DialogContent>
@@ -212,16 +285,23 @@ export default function UserManagementPage() {
                   <TableCell className="text-right">
                     <DropdownMenu>
                       <DropdownMenuTrigger asChild>
-                        <Button variant="ghost" size="icon">
+                        <Button variant="ghost" size="icon" disabled={u.isSuperAdmin && !user?.isSuperAdmin && user?.user_id !== u.user_id}>
                           <MoreHorizontal className="h-4 w-4" />
                           <span className="sr-only">Actions</span>
                         </Button>
                       </DropdownMenuTrigger>
                       <DropdownMenuContent align="end">
-                        <DropdownMenuItem onClick={() => handleEditUser(u.user_id)}>
+                        <DropdownMenuItem 
+                            onClick={() => handleOpenEditDialog(u)}
+                            disabled={(user?.role === 'Staff' && !user?.isSuperAdmin && (u.role === 'Staff' || u.isSuperAdmin))}
+                        >
                           <Edit className="mr-2 h-4 w-4" /> Edit
                         </DropdownMenuItem>
-                        <DropdownMenuItem onClick={() => handleDeleteUser(u.user_id)} className="text-destructive focus:text-destructive focus:bg-destructive/10">
+                        <DropdownMenuItem 
+                            onClick={() => handleDeleteUser(u.user_id)} 
+                            className="text-destructive focus:text-destructive focus:bg-destructive/10"
+                            disabled={ (user?.role === 'Staff' && !user?.isSuperAdmin && (u.role === 'Staff' || u.isSuperAdmin)) || (u.isSuperAdmin && u.user_id === user?.user_id) }
+                        >
                           <Trash2 className="mr-2 h-4 w-4" /> Delete
                         </DropdownMenuItem>
                       </DropdownMenuContent>
@@ -259,6 +339,31 @@ export default function UserManagementPage() {
             Next
           </Button>
         </div>
+      )}
+
+      {editingUser && (
+        <Dialog open={isEditUserDialogOpen} onOpenChange={(isOpen) => {
+          setIsEditUserDialogOpen(isOpen);
+          if (!isOpen) setEditingUser(null);
+        }}>
+          <DialogContent className="sm:max-w-[600px]">
+            <DialogHeader>
+              <DialogTitle>Edit User: {editingUser.username}</DialogTitle>
+              <DialogDescription>
+                Modify the user details below.
+              </DialogDescription>
+            </DialogHeader>
+            <EditUserForm
+              userToEdit={editingUser}
+              onSubmit={handleEditUserSubmit}
+              onCancel={() => { setIsEditUserDialogOpen(false); setEditingUser(null); }}
+              availableRoles={availableRolesForEdit}
+              isSubmitting={isSubmitting}
+              currentUserRole={user?.role}
+              isCurrentUserSuperAdmin={user?.isSuperAdmin}
+            />
+          </DialogContent>
+        </Dialog>
       )}
     </div>
   );

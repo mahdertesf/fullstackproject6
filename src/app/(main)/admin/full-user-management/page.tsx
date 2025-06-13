@@ -17,7 +17,8 @@ import { mockUserProfiles, mockUsers } from '@/lib/data';
 import type { UserProfile, UserRole } from '@/types';
 import { Badge } from '@/components/ui/badge';
 import AddUserForm from '@/components/users/AddUserForm';
-import { NewUserFormData } from '@/lib/schemas';
+import EditUserForm from '@/components/users/EditUserForm';
+import { NewUserFormData, EditUserFormData } from '@/lib/schemas';
 import { useToast } from '@/hooks/use-toast';
 
 const ITEMS_PER_PAGE = 10;
@@ -31,6 +32,8 @@ export default function FullUserManagementPage() {
   const [selectedRole, setSelectedRole] = useState<UserRole | 'all'>('all');
   const [currentPage, setCurrentPage] = useState(1);
   const [isAddUserDialogOpen, setIsAddUserDialogOpen] = useState(false);
+  const [isEditUserDialogOpen, setIsEditUserDialogOpen] = useState(false);
+  const [editingUser, setEditingUser] = useState<UserProfile | null>(null);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [usersList, setUsersList] = useState<UserProfile[]>(mockUserProfiles);
 
@@ -60,23 +63,65 @@ export default function FullUserManagementPage() {
     currentPage * ITEMS_PER_PAGE
   );
   
-  const handleEditUser = (userId: number) => {
-    console.log(`Edit user: ${userId}`);
-    toast({ title: 'Edit User (Not Implemented)', description: `Functionality to edit user ${userId} is not yet implemented.` });
+  const handleOpenEditDialog = (userToEdit: UserProfile) => {
+    setEditingUser(userToEdit);
+    setIsEditUserDialogOpen(true);
+  };
+
+  const handleEditUserSubmit = async (data: EditUserFormData) => {
+    if (!editingUser) return;
+    setIsSubmitting(true);
+    console.log("Editing user data (Admin):", editingUser.user_id, data);
+    
+    await new Promise(resolve => setTimeout(resolve, 1000)); // Simulate API call
+
+    setUsersList(prev => 
+      prev.map(u => 
+        u.user_id === editingUser.user_id 
+          ? { 
+              ...u, 
+              username: data.username,
+              email: data.email,
+              first_name: data.firstName,
+              last_name: data.lastName,
+              role: data.role,
+              is_active: data.is_active,
+              // SuperAdmins can be demoted only by other SuperAdmins, but logic can be complex.
+              // For mock, we'll allow role change, but a real system needs careful checks.
+              isSuperAdmin: data.role === 'Staff' ? (editingUser.isSuperAdmin || false) : undefined, // Keep superadmin if they are staff, or make them not if role changes
+              updated_at: new Date().toISOString(),
+            } 
+          : u
+      )
+    );
+    
+    toast({
+      title: 'User Updated (Mock)',
+      description: `User ${data.username} has been updated.`,
+    });
+    setIsSubmitting(false);
+    setIsEditUserDialogOpen(false);
+    setEditingUser(null);
   };
 
   const handleDeleteUser = (userId: number) => {
+    const userToDelete = usersList.find(u => u.user_id === userId);
+    if (userToDelete?.isSuperAdmin && user?.user_id === userToDelete.user_id) {
+        toast({ variant: 'destructive', title: 'Action Denied', description: 'Super Admins cannot delete their own account.'});
+        return;
+    }
     console.log(`Delete user: ${userId}`);
-    toast({ title: 'Delete User (Not Implemented)', description: `Functionality to delete user ${userId} is not yet implemented.` });
+    // Mock deletion:
+    // setUsersList(prev => prev.filter(u => u.user_id !== userId));
+    toast({ title: 'Delete User (Not Implemented)', description: `Functionality to delete user ${userId} is not yet fully implemented. Mocked.` });
   };
 
   const handleAddNewUser = async (data: NewUserFormData) => {
     setIsSubmitting(true);
     console.log("New user data (Admin):", data);
-    // Mock adding user
     await new Promise(resolve => setTimeout(resolve, 1000)); 
 
-    const newUserId = Math.max(...mockUsers.map(u => u.user_id), 0) + 1;
+    const newUserId = Math.max(...usersList.map(u => u.user_id), 0) + 1;
     const newUserProfile: UserProfile = {
       user_id: newUserId,
       username: data.username,
@@ -88,7 +133,7 @@ export default function FullUserManagementPage() {
       password_hash: 'mock_hash', 
       created_at: new Date().toISOString(),
       updated_at: new Date().toISOString(),
-      isSuperAdmin: data.role === 'Staff' ? false : undefined, // Example: new staff are not super by default
+      isSuperAdmin: data.role === 'Staff' ? false : undefined, // New staff are not super by default, can be promoted later
     };
     setUsersList(prev => [...prev, newUserProfile]);
 
@@ -110,6 +155,8 @@ export default function FullUserManagementPage() {
       </div>
     );
   }
+  
+  const availableRoles: UserRole[] = ['Student', 'Teacher', 'Staff'];
 
   return (
     <div className="space-y-6">
@@ -134,7 +181,7 @@ export default function FullUserManagementPage() {
               <AddUserForm
                 onSubmit={handleAddNewUser}
                 onCancel={() => setIsAddUserDialogOpen(false)}
-                availableRoles={['Student', 'Teacher', 'Staff']}
+                availableRoles={availableRoles}
                 isSubmitting={isSubmitting}
               />
             </DialogContent>
@@ -213,16 +260,23 @@ export default function FullUserManagementPage() {
                     <TableCell className="text-right">
                       <DropdownMenu>
                         <DropdownMenuTrigger asChild>
-                          <Button variant="ghost" size="icon">
+                           <Button variant="ghost" size="icon" disabled={u.isSuperAdmin && user?.user_id !== u.user_id && !user.isSuperAdmin /* Non-super admins cannot even open menu for other super admins */}>
                             <MoreHorizontal className="h-4 w-4" />
                             <span className="sr-only">Actions</span>
                           </Button>
                         </DropdownMenuTrigger>
                         <DropdownMenuContent align="end">
-                          <DropdownMenuItem onClick={() => handleEditUser(u.user_id)}>
+                          <DropdownMenuItem 
+                            onClick={() => handleOpenEditDialog(u)}
+                            disabled={u.isSuperAdmin && user?.user_id !== u.user_id && !user.isSuperAdmin /* Prevent editing other super admins by non-super admins */}
+                          >
                             <Edit className="mr-2 h-4 w-4" /> Edit
                           </DropdownMenuItem>
-                          <DropdownMenuItem onClick={() => handleDeleteUser(u.user_id)} className="text-destructive focus:text-destructive focus:bg-destructive/10">
+                          <DropdownMenuItem 
+                            onClick={() => handleDeleteUser(u.user_id)} 
+                            className="text-destructive focus:text-destructive focus:bg-destructive/10"
+                            disabled={u.isSuperAdmin && u.user_id === user?.user_id /* Prevent super admin from deleting self */}
+                          >
                             <Trash2 className="mr-2 h-4 w-4" /> Delete
                           </DropdownMenuItem>
                         </DropdownMenuContent>
@@ -261,6 +315,31 @@ export default function FullUserManagementPage() {
             Next
           </Button>
         </div>
+      )}
+
+      {editingUser && (
+        <Dialog open={isEditUserDialogOpen} onOpenChange={(isOpen) => {
+          setIsEditUserDialogOpen(isOpen);
+          if (!isOpen) setEditingUser(null);
+        }}>
+          <DialogContent className="sm:max-w-[600px]">
+            <DialogHeader>
+              <DialogTitle>Edit User: {editingUser.username}</DialogTitle>
+              <DialogDescription>
+                Modify the user details below. As an Admin, you can manage all roles.
+              </DialogDescription>
+            </DialogHeader>
+            <EditUserForm
+              userToEdit={editingUser}
+              onSubmit={handleEditUserSubmit}
+              onCancel={() => { setIsEditUserDialogOpen(false); setEditingUser(null); }}
+              availableRoles={availableRoles}
+              isSubmitting={isSubmitting}
+              currentUserRole={user?.role}
+              isCurrentUserSuperAdmin={user?.isSuperAdmin}
+            />
+          </DialogContent>
+        </Dialog>
       )}
     </div>
   );

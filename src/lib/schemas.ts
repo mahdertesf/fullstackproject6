@@ -1,3 +1,4 @@
+
 import { z } from 'zod';
 
 export const LoginSchema = z.object({
@@ -42,3 +43,13 @@ export const NewUserSchema = z.object({
   path: ["confirmPassword"], // Path to field to display error
 });
 export type NewUserFormData = z.infer<typeof NewUserSchema>;
+
+export const EditUserSchema = z.object({
+  username: z.string().min(3, "Username must be at least 3 characters."),
+  email: z.string().email("Invalid email address."),
+  firstName: z.string().optional(),
+  lastName: z.string().optional(),
+  role: z.enum(['Student', 'Teacher', 'Staff'], { required_error: "Role is required." }),
+  is_active: z.boolean().default(true),
+});
+export type EditUserFormData = z.infer<typeof EditUserSchema>;
