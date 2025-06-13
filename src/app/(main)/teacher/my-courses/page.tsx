@@ -3,10 +3,10 @@
 
 import { useEffect, useState, useMemo } from 'react';
 import PageHeader from '@/components/shared/PageHeader';
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
+import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from '@/components/ui/card';
 import { useAuthStore } from '@/store/authStore';
 import { useRouter } from 'next/navigation';
-import { BookOpen, ShieldAlert, CalendarDays, Tag } from 'lucide-react';
+import { BookOpen, ShieldAlert, CalendarDays, Tag, ArrowRight } from 'lucide-react';
 import { mockScheduledCourses, mockCourses, mockSemesters } from '@/lib/data';
 import type { ScheduledCourse, Course, Semester, UserProfile } from '@/types';
 import Link from 'next/link';
@@ -30,9 +30,9 @@ export default function TeacherMyCoursesPage() {
 
   useEffect(() => {
     if (user && user.role === 'Teacher') {
-      const currentUser = user as UserProfile; // Cast to ensure teacher_id is expected
+      const currentUser = user as UserProfile; 
       const scheduled = mockScheduledCourses
-        .filter(sc => sc.teacher_id === currentUser.user_id) // Assuming user_id maps to teacher_id for mock
+        .filter(sc => sc.teacher_id === currentUser.user_id) 
         .map(sc => {
           const courseDetails = mockCourses.find(c => c.course_id === sc.course_id);
           const semesterDetails = mockSemesters.find(s => s.semester_id === sc.semester_id);
@@ -90,12 +90,13 @@ export default function TeacherMyCoursesPage() {
                     Enrollment: {tc.current_enrollment} / {tc.max_capacity}
                   </p>
               </CardContent>
-              {/* Future: Link to course management page for this specific instance */}
-              {/* <CardFooter>
+              <CardFooter>
                 <Button variant="outline" className="w-full" asChild>
-                  <Link href={`/teacher/my-courses/${tc.scheduled_course_id}`}>Manage Course</Link>
+                  <Link href={`/teacher/my-courses/${tc.scheduled_course_id}`}>
+                    Manage Course & Materials <ArrowRight className="ml-2 h-4 w-4" />
+                  </Link>
                 </Button>
-              </CardFooter> */}
+              </CardFooter>
             </Card>
           ))}
         </div>

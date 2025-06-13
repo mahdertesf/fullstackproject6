@@ -143,3 +143,24 @@ export const RoomFormDataSchema = z.object({
   type: z.string().max(50, "Type must be 50 characters or less.").optional(),
 });
 export type RoomFormData = z.infer<typeof RoomFormDataSchema>;
+
+export const CourseMaterialUploadSchema = z.object({
+  title: z.string().min(3, "Title must be at least 3 characters long."),
+  description: z.string().optional(),
+  material_type: z.enum(['File', 'Link'], { required_error: "Material type is required." }),
+  file_path: z.string().optional(), // Mock file path for now
+  url: z.string().url({ message: "Please enter a valid URL." }).optional(),
+}).refine(data => {
+  if (data.material_type === 'File') return !!data.file_path && data.file_path.length > 0;
+  return true;
+}, {
+  message: "File path is required for 'File' type materials.",
+  path: ['file_path'],
+}).refine(data => {
+  if (data.material_type === 'Link') return !!data.url && data.url.length > 0;
+  return true;
+}, {
+  message: "URL is required for 'Link' type materials.",
+  path: ['url'],
+});
+export type CourseMaterialUploadFormData = z.infer<typeof CourseMaterialUploadSchema>;
