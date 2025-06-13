@@ -1,3 +1,4 @@
+
 'use client';
 
 import { zodResolver } from '@hookform/resolvers/zod';
@@ -13,9 +14,11 @@ import { generateAnnouncement } from '@/ai/flows/generate-announcement';
 import { useState } from 'react';
 import { Wand2, Loader2, Send } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
+import type { AnnouncementTargetAudience, AnnouncementTone } from '@/types';
 
-// Desired tones based on schema, can be dynamic in a real app
-const desiredTones = ['Formal', 'Urgent', 'Friendly', 'Informative', 'Academic'];
+
+const desiredTones: AnnouncementTone[] = ['Formal', 'Urgent', 'Friendly', 'Informative', 'Academic'];
+const targetAudiences: AnnouncementTargetAudience[] = ['Students', 'Teachers', 'Staff', 'All Users'];
 
 export default function AnnouncementGeneratorForm() {
   const { toast } = useToast();
@@ -29,6 +32,7 @@ export default function AnnouncementGeneratorForm() {
     defaultValues: {
       topic: '',
       desiredTone: 'Friendly',
+      targetAudience: 'All Users',
     },
   });
 
@@ -36,7 +40,6 @@ export default function AnnouncementGeneratorForm() {
     const formData = form.getValues();
     const validationResult = AnnouncementGeneratorSchema.safeParse(formData);
     if (!validationResult.success) {
-      // Trigger validation messages
       form.trigger();
       return;
     }
@@ -64,14 +67,18 @@ export default function AnnouncementGeneratorForm() {
 
   const handleSubmitGenerated = async () => {
     setIsSubmitting(true);
-    // In a real app, this would submit generatedTitle and generatedContent to backend
-    console.log('Submitting announcement:', { title: generatedTitle, content: generatedContent, tone: form.getValues('desiredTone') });
-    await new Promise(resolve => setTimeout(resolve, 1000)); // Simulate API call
+    const formData = form.getValues();
+    console.log('Submitting announcement:', { 
+      title: generatedTitle, 
+      content: generatedContent, 
+      tone: formData.desiredTone,
+      targetAudience: formData.targetAudience 
+    });
+    await new Promise(resolve => setTimeout(resolve, 1000)); 
     toast({
       title: 'Announcement Submitted (Mock)',
       description: 'Your announcement has been notionally submitted.',
     });
-    // Reset fields
     setGeneratedTitle('');
     setGeneratedContent('');
     form.reset();
@@ -82,7 +89,7 @@ export default function AnnouncementGeneratorForm() {
     <Card className="w-full max-w-2xl mx-auto">
       <CardHeader>
         <CardTitle className="text-2xl font-headline">AI Announcement Generator</CardTitle>
-        <CardDescription>Let AI help you craft the perfect announcement. Enter a topic and desired tone.</CardDescription>
+        <CardDescription>Let AI help you craft the perfect announcement. Enter a topic, desired tone, and target audience.</CardDescription>
       </CardHeader>
       <Form {...form}>
         <CardContent className="space-y-6">
@@ -99,28 +106,52 @@ export default function AnnouncementGeneratorForm() {
               </FormItem>
             )}
           />
-          <FormField
-            control={form.control}
-            name="desiredTone"
-            render={({ field }) => (
-              <FormItem>
-                <FormLabel>Desired Tone</FormLabel>
-                <Select onValueChange={field.onChange} defaultValue={field.value}>
-                  <FormControl>
-                    <SelectTrigger>
-                      <SelectValue placeholder="Select a tone" />
-                    </SelectTrigger>
-                  </FormControl>
-                  <SelectContent>
-                    {desiredTones.map(tone => (
-                      <SelectItem key={tone} value={tone}>{tone}</SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
-                <FormMessage />
-              </FormItem>
-            )}
-          />
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+            <FormField
+              control={form.control}
+              name="desiredTone"
+              render={({ field }) => (
+                <FormItem>
+                  <FormLabel>Desired Tone</FormLabel>
+                  <Select onValueChange={field.onChange} defaultValue={field.value}>
+                    <FormControl>
+                      <SelectTrigger>
+                        <SelectValue placeholder="Select a tone" />
+                      </SelectTrigger>
+                    </FormControl>
+                    <SelectContent>
+                      {desiredTones.map(tone => (
+                        <SelectItem key={tone} value={tone}>{tone}</SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                  <FormMessage />
+                </FormItem>
+              )}
+            />
+            <FormField
+              control={form.control}
+              name="targetAudience"
+              render={({ field }) => (
+                <FormItem>
+                  <FormLabel>Target Audience</FormLabel>
+                  <Select onValueChange={field.onChange} defaultValue={field.value}>
+                    <FormControl>
+                      <SelectTrigger>
+                        <SelectValue placeholder="Select target audience" />
+                      </SelectTrigger>
+                    </FormControl>
+                    <SelectContent>
+                      {targetAudiences.map(audience => (
+                        <SelectItem key={audience} value={audience}>{audience}</SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                  <FormMessage />
+                </FormItem>
+              )}
+            />
+          </div>
           <Button type="button" onClick={handleGenerateAnnouncement} disabled={isLoadingAi} className="w-full bg-accent hover:bg-accent/90">
             {isLoadingAi ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <Wand2 className="mr-2 h-4 w-4" />}
             Generate with AI

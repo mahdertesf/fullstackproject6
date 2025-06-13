@@ -1,3 +1,4 @@
+
 // src/ai/flows/generate-announcement.ts
 'use server';
 
@@ -11,15 +12,16 @@
 
 import {ai} from '@/ai/genkit';
 import {z} from 'genkit';
+import type { AnnouncementTargetAudience, AnnouncementTone } from '@/types';
 
 const GenerateAnnouncementInputSchema = z.object({
   topic: z.string().describe('A brief topic for the announcement.'),
   desiredTone: z
     .string()
     .describe(
-      'The desired tone of the announcement (e.g., Formal, Urgent, Friendly).' + 
-      'This should match the `desired_tone` column of the Announcements table in the database.'
+      'The desired tone of the announcement (e.g., Formal, Urgent, Friendly).'
     ),
+  targetAudience: z.enum(['Students', 'Teachers', 'Staff', 'All Users']).describe('The intended audience for the announcement (e.g., Students, Teachers, All Users).'),
 });
 export type GenerateAnnouncementInput = z.infer<typeof GenerateAnnouncementInputSchema>;
 
@@ -41,11 +43,12 @@ const announcementPrompt = ai.definePrompt({
   output: {schema: GenerateAnnouncementOutputSchema},
   prompt: `You are an AI assistant tasked with generating announcement titles and content for a university portal.
 
-  Based on the provided topic and desired tone, generate a suitable title and content for the announcement.
+  Based on the provided topic, desired tone, and target audience, generate a suitable title and content for the announcement.
   Ensure the announcement is clear, concise, and appropriate for the intended audience.
 
   Topic: {{{topic}}}
   Desired Tone: {{{desiredTone}}}
+  Target Audience: {{{targetAudience}}}
 
   Title: (Provide a suitable title here)
   Content: (Provide the announcement content here)
@@ -63,3 +66,4 @@ const generateAnnouncementFlow = ai.defineFlow(
     return output!;
   }
 );
+

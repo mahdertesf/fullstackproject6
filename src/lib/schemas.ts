@@ -9,7 +9,8 @@ export type LoginFormData = z.infer<typeof LoginSchema>;
 
 export const AnnouncementGeneratorSchema = z.object({
   topic: z.string().min(3, { message: "Topic must be at least 3 characters long." }),
-  desiredTone: z.enum(['Formal', 'Urgent', 'Friendly', 'Informative', 'Academic']), // Expand as needed from DB
+  desiredTone: z.enum(['Formal', 'Urgent', 'Friendly', 'Informative', 'Academic']), 
+  targetAudience: z.enum(['Students', 'Teachers', 'Staff', 'All Users'], { required_error: "Target audience is required."}),
 });
 export type AnnouncementGeneratorFormData = z.infer<typeof AnnouncementGeneratorSchema>;
 
@@ -171,3 +172,4 @@ export const AssessmentSchema = z.object({
   assessment_type: z.string().optional(),
 });
 export type AssessmentFormData = z.infer<typeof AssessmentSchema>;
+

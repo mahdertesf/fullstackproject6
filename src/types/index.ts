@@ -180,6 +180,7 @@ export interface AuditLog {
 
 export type AnnouncementStatus = 'Draft' | 'Scheduled' | 'Published' | 'Archived';
 export type AnnouncementTone = 'Formal' | 'Urgent' | 'Friendly' | 'Informative' | 'Academic';
+export type AnnouncementTargetAudience = 'Students' | 'Teachers' | 'Staff' | 'All Users';
 
 
 export interface Announcement {
@@ -187,7 +188,7 @@ export interface Announcement {
   title: string;
   content: string;
   author_id: number;
-  target_audience: string;
+  target_audience: AnnouncementTargetAudience;
   desired_tone?: AnnouncementTone | null;
   status: AnnouncementStatus;
   publish_date?: string | null;
@@ -246,3 +247,4 @@ export interface EnrichedRegistration extends Registration {
   assessments?: (Assessment & { studentScore?: StudentAssessmentScore })[];
   materials?: CourseMaterial[];
 }
+

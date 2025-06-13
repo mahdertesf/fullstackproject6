@@ -1,5 +1,5 @@
 
-import type { User, Department, Course, Student, Teacher, Staff, Semester, Announcement, ScheduledCourse, Registration, CourseMaterial, Assessment, UserProfile, Building, Room, Prerequisite, AuditLog, StudentAssessmentScore } from '@/types';
+import type { User, Department, Course, Student, Teacher, Staff, Semester, Announcement, ScheduledCourse, Registration, CourseMaterial, Assessment, UserProfile, Building, Room, Prerequisite, AuditLog, StudentAssessmentScore, AnnouncementTargetAudience } from '@/types';
 
 export const mockUsers: User[] = [
   { user_id: 1, username: 'admin', password_hash: 'hashed_password', email: 'admin@cotbe.edu', role: 'Staff', is_active: true, created_at: new Date().toISOString(), updated_at: new Date().toISOString() },
@@ -289,3 +289,4 @@ export const gradePointMapping: Record<string, number> = {
   'F': 0.0,
 };
     
+
