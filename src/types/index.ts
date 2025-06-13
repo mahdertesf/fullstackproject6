@@ -140,11 +140,11 @@ export interface Registration {
   scheduled_course_id: number;
   registration_date: string;
   status: RegistrationStatus;
-  final_grade?: string | null; // This will be the letter grade
-  grade_points?: number | null;
+  final_grade?: string | null; 
+  grade_points?: number | null; // Store actual grade points earned for the course (e.g., 3 credits * 4.0 for A = 12 points)
   updated_at: string;
-  student?: Student; // Optional
-  scheduledCourse?: ScheduledCourse; // Optional
+  student?: UserProfile; // Changed from Student to UserProfile
+  scheduledCourse?: ScheduledCourse; 
   overall_percentage?: number | null;
   final_letter_grade?: string | null;
 }
@@ -160,10 +160,10 @@ export interface CourseMaterial {
   material_type: MaterialType;
   file_path?: string | null;
   url?: string | null;
-  uploaded_by: number; // teacher_id
+  uploaded_by: number; 
   upload_timestamp: string;
-  scheduledCourse?: ScheduledCourse; // Optional
-  uploader?: Teacher; // Optional
+  scheduledCourse?: ScheduledCourse; 
+  uploader?: UserProfile; // Changed from Teacher to UserProfile
 }
 
 export interface AuditLog {
@@ -175,10 +175,12 @@ export interface AuditLog {
   timestamp: string;
   ip_address?: string | null;
   details?: string | null;
-  user?: User; // Optional
+  user?: UserProfile; // Changed from User to UserProfile
 }
 
 export type AnnouncementStatus = 'Draft' | 'Scheduled' | 'Published' | 'Archived';
+export type AnnouncementTone = 'Formal' | 'Urgent' | 'Friendly' | 'Informative' | 'Academic';
+
 
 export interface Announcement {
   announcement_id: number;
@@ -186,7 +188,7 @@ export interface Announcement {
   content: string;
   author_id: number;
   target_audience: string;
-  desired_tone?: string | null;
+  desired_tone?: AnnouncementTone | null;
   status: AnnouncementStatus;
   publish_date?: string | null;
   expiry_date?: string | null;
@@ -194,15 +196,25 @@ export interface Announcement {
   semester_id?: number | null;
   created_at: string;
   updated_at: string;
-  author?: User; // Optional
-  department?: Department; // Optional
-  semester?: Semester; // Optional
+  author?: UserProfile; // Changed from User to UserProfile
+  department?: Department; 
+  semester?: Semester; 
 }
 
 // Combined user profile type for easier handling in profile page
-export type UserProfile = (User & Partial<Student> & Partial<Teacher> & Partial<Staff>) & {
+// Ensure this UserProfile is comprehensive enough for all roles.
+export type UserProfile = User & Partial<Omit<Student, 'student_id'|'department_id'|'enrollment_date'|'updated_at'>> & Partial<Omit<Teacher, 'teacher_id'|'department_id'|'updated_at'>> & Partial<Omit<Staff, 'staff_id'|'updated_at'>> & {
   isSuperAdmin?: boolean;
+  profile_picture_url?: string;
+  // Fields from Student
+  department_id?: number; // department_id can come from Student or Teacher
+  enrollment_date?: string;
+  // Fields from Teacher
+  // office_location is already in Teacher part
+  // Fields from Staff
+  // job_title is already in Staff part
 };
+
 
 // For Grade Management
 export interface Assessment {
@@ -217,11 +229,20 @@ export interface Assessment {
 
 export interface StudentAssessmentScore {
   student_assessment_score_id: number;
-  registration_id: number; // Links to student's enrollment in the course
+  registration_id: number; 
   assessment_id: number;
   score_achieved?: number | null;
   graded_timestamp?: string | null;
   feedback?: string | null;
-  assessment?: Assessment; // Optional
-  registration?: Registration; // Optional
+  assessment?: Assessment; 
+  registration?: Registration; 
+}
+
+// Helper type for enriched registration data used in frontend components
+export interface EnrichedRegistration extends Registration {
+  studentProfile?: UserProfile;
+  courseDetails?: Course;
+  semesterDetails?: Semester;
+  assessments?: (Assessment & { studentScore?: StudentAssessmentScore })[];
+  materials?: CourseMaterial[];
 }

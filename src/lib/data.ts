@@ -33,31 +33,37 @@ export const mockPrerequisites: Prerequisite[] = [
   { prerequisite_id: 3, course_id: 6, prerequisite_course_id: 1 }, // SE320 requires SE301
 ];
 
-export const mockStudents: Student[] = [
+export const mockStudentsData: Omit<Student, 'user' | 'department'>[] = [
   { student_id: 4, first_name: 'Abebe', last_name: 'Kebede', department_id: 1, enrollment_date: new Date().toISOString(), updated_at: new Date().toISOString(), phone_number: '0912345678', address: 'Addis Ababa' },
   { student_id: 5, first_name: 'Sara', last_name: 'Taye', department_id: 2, enrollment_date: new Date().toISOString(), updated_at: new Date().toISOString(), phone_number: '0987654321', address: 'Addis Ababa' },
   { student_id: 7, first_name: 'Frehiwot', last_name: 'Assefa', department_id: 1, enrollment_date: new Date().toISOString(), updated_at: new Date().toISOString(), phone_number: '0911111111', address: 'Adama' },
 ];
 
-export const mockTeachers: Teacher[] = [
+export const mockTeachersData: Omit<Teacher, 'user' | 'department'>[] = [
   { teacher_id: 3, first_name: 'Lemma', last_name: 'Guya', department_id: 1, office_location: 'Block C, Room 101', updated_at: new Date().toISOString(), phone_number: '0911223344'},
   { teacher_id: 6, first_name: 'Biruk', last_name: 'Samuel', department_id: 1, office_location: 'Block D, Room 202', updated_at: new Date().toISOString(), phone_number: '0922334455'},
 ];
 
-export const mockStaff: Staff[] = [
+export const mockStaffData: Omit<Staff, 'user'>[] = [
   { staff_id: 1, first_name: 'Super', last_name: 'Admin', job_title: 'Portal Administrator', updated_at: new Date().toISOString() },
   { staff_id: 2, first_name: 'Chala', last_name: 'Bulti', job_title: 'Academic Registrar', updated_at: new Date().toISOString() },
 ];
 
-export const mockUserProfiles: UserProfile[] = [
-    { ...mockUsers[0], ...mockStaff[0], isSuperAdmin: true },
-    { ...mockUsers[1], ...mockStaff[1] },
-    { ...mockUsers[2], ...mockTeachers[0] },
-    { ...mockUsers[3], ...mockStudents[0] },
-    { ...mockUsers[4], ...mockStudents[1] },
-    { ...mockUsers[5], ...mockTeachers[1] },
-    { ...mockUsers[6], ...mockStudents[2] },
-];
+export const mockUserProfiles: UserProfile[] = mockUsers.map(user => {
+  let profileData: Partial<UserProfile> = {};
+  if (user.role === 'Student') {
+    const studentInfo = mockStudentsData.find(s => s.student_id === user.user_id);
+    if (studentInfo) profileData = { ...profileData, ...studentInfo, department_id: studentInfo.department_id };
+  } else if (user.role === 'Teacher') {
+    const teacherInfo = mockTeachersData.find(t => t.teacher_id === user.user_id);
+     if (teacherInfo) profileData = { ...profileData, ...teacherInfo, department_id: teacherInfo.department_id };
+  } else if (user.role === 'Staff') {
+    const staffInfo = mockStaffData.find(s => s.staff_id === user.user_id);
+    if (staffInfo) profileData = { ...profileData, ...staffInfo };
+    if (user.username === 'admin') profileData.isSuperAdmin = true;
+  }
+  return { ...user, ...profileData };
+});
 
 
 export const mockSemesters: Semester[] = [
@@ -84,26 +90,47 @@ export const mockAnnouncements: Announcement[] = [
 ];
 
 export const mockScheduledCourses: ScheduledCourse[] = [
-    { scheduled_course_id: 1, course_id: 1, semester_id: 2, teacher_id: 3, room_id: 1, section_number: 'S1', max_capacity: 50, current_enrollment: 25, days_of_week: 'MWF', start_time: '09:00:00', end_time: '09:50:00', created_at: new Date().toISOString(), updated_at: new Date().toISOString(), course: mockCourses[0], semester: mockSemesters[1], teacher: mockTeachers[0], room: mockRooms[0] },
-    { scheduled_course_id: 2, course_id: 5, semester_id: 2, teacher_id: 3, room_id: 3, section_number: 'S1', max_capacity: 40, current_enrollment: 30, days_of_week: 'TTH', start_time: '14:00:00', end_time: '15:20:00', created_at: new Date().toISOString(), updated_at: new Date().toISOString(), course: mockCourses[4], semester: mockSemesters[1], teacher: mockTeachers[0], room: mockRooms[2] },
-    { scheduled_course_id: 3, course_id: 6, semester_id: 2, teacher_id: 6, room_id: 2, section_number: 'S1', max_capacity: 35, current_enrollment: 15, days_of_week: 'MWF', start_time: '10:00:00', end_time: '10:50:00', created_at: new Date().toISOString(), updated_at: new Date().toISOString(), course: mockCourses[5], semester: mockSemesters[1], teacher: mockTeachers[1], room: mockRooms[1] },
-    { scheduled_course_id: 4, course_id: 1, semester_id: 2, teacher_id: 3, room_id: 4, section_number: 'S2', max_capacity: 30, current_enrollment: 10, days_of_week: 'TTH', start_time: '10:00:00', end_time: '11:20:00', created_at: new Date().toISOString(), updated_at: new Date().toISOString(), course: mockCourses[0], semester: mockSemesters[1], teacher: mockTeachers[0], room: mockRooms[3] },
-    { scheduled_course_id: 5, course_id: 2, semester_id: 2, teacher_id: 6, room_id: 1, section_number: 'S1', max_capacity: 60, current_enrollment: 40, days_of_week: 'MWF', start_time: '13:00:00', end_time: '13:50:00', created_at: new Date().toISOString(), updated_at: new Date().toISOString(), course: mockCourses[1], semester: mockSemesters[1], teacher: mockTeachers[1], room: mockRooms[0] },
+    { scheduled_course_id: 1, course_id: 1, semester_id: 2, teacher_id: 3, room_id: 1, section_number: 'S1', max_capacity: 50, current_enrollment: 25, days_of_week: 'MWF', start_time: '09:00:00', end_time: '09:50:00', created_at: new Date().toISOString(), updated_at: new Date().toISOString(), course: mockCourses[0], semester: mockSemesters[1], teacher: mockUserProfiles.find(t=>t.user_id===3), room: mockRooms[0] },
+    { scheduled_course_id: 2, course_id: 5, semester_id: 2, teacher_id: 3, room_id: 3, section_number: 'S1', max_capacity: 40, current_enrollment: 30, days_of_week: 'TTH', start_time: '14:00:00', end_time: '15:20:00', created_at: new Date().toISOString(), updated_at: new Date().toISOString(), course: mockCourses[4], semester: mockSemesters[1], teacher: mockUserProfiles.find(t=>t.user_id===3), room: mockRooms[2] },
+    { scheduled_course_id: 3, course_id: 6, semester_id: 2, teacher_id: 6, room_id: 2, section_number: 'S1', max_capacity: 35, current_enrollment: 15, days_of_week: 'MWF', start_time: '10:00:00', end_time: '10:50:00', created_at: new Date().toISOString(), updated_at: new Date().toISOString(), course: mockCourses[5], semester: mockSemesters[1], teacher: mockUserProfiles.find(t=>t.user_id===6), room: mockRooms[1] },
+    { scheduled_course_id: 4, course_id: 1, semester_id: 2, teacher_id: 3, room_id: 4, section_number: 'S2', max_capacity: 30, current_enrollment: 10, days_of_week: 'TTH', start_time: '10:00:00', end_time: '11:20:00', created_at: new Date().toISOString(), updated_at: new Date().toISOString(), course: mockCourses[0], semester: mockSemesters[1], teacher: mockUserProfiles.find(t=>t.user_id===3), room: mockRooms[3] },
+    { scheduled_course_id: 5, course_id: 2, semester_id: 2, teacher_id: 6, room_id: 1, section_number: 'S1', max_capacity: 60, current_enrollment: 40, days_of_week: 'MWF', start_time: '13:00:00', end_time: '13:50:00', created_at: new Date().toISOString(), updated_at: new Date().toISOString(), course: mockCourses[1], semester: mockSemesters[1], teacher: mockUserProfiles.find(t=>t.user_id===6), room: mockRooms[0] },
+    // Fall 2023 courses for past records
+    { scheduled_course_id: 6, course_id: 1, semester_id: 1, teacher_id: 3, room_id: 1, section_number: 'S1', max_capacity: 50, current_enrollment: 48, days_of_week: 'MWF', start_time: '09:00:00', end_time: '09:50:00', created_at: new Date().toISOString(), updated_at: new Date().toISOString(), course: mockCourses[0], semester: mockSemesters[0], teacher: mockUserProfiles.find(t=>t.user_id===3), room: mockRooms[0] },
+    { scheduled_course_id: 7, course_id: 3, semester_id: 1, teacher_id: 6, room_id: 3, section_number: 'S1', max_capacity: 40, current_enrollment: 35, days_of_week: 'TTH', start_time: '14:00:00', end_time: '15:20:00', created_at: new Date().toISOString(), updated_at: new Date().toISOString(), course: mockCourses[2], semester: mockSemesters[0], teacher: mockUserProfiles.find(t=>t.user_id===6), room: mockRooms[2] },
 ];
 
 export const mockRegistrations: Registration[] = [
-    { registration_id: 1, student_id: 4, scheduled_course_id: 1, registration_date: new Date().toISOString(), status: 'Registered', updated_at: new Date().toISOString(), student: mockStudents[0], scheduledCourse: mockScheduledCourses[0], overall_percentage: null, final_letter_grade: null },
-    { registration_id: 2, student_id: 4, scheduled_course_id: 2, registration_date: new Date().toISOString(), status: 'Registered', updated_at: new Date().toISOString(), student: mockStudents[0], scheduledCourse: mockScheduledCourses[1], overall_percentage: null, final_letter_grade: null },
-    { registration_id: 3, student_id: 5, scheduled_course_id: 1, registration_date: new Date().toISOString(), status: 'Completed', final_grade: 'A', grade_points: 4.0, updated_at: new Date().toISOString(), student: mockStudents[1], scheduledCourse: mockScheduledCourses[0], overall_percentage: 92, final_letter_grade: 'A' },
-    { registration_id: 4, student_id: 7, scheduled_course_id: 1, registration_date: new Date().toISOString(), status: 'Registered', updated_at: new Date().toISOString(), student: mockStudents[2], scheduledCourse: mockScheduledCourses[0], overall_percentage: null, final_letter_grade: null },
-    { registration_id: 5, student_id: 7, scheduled_course_id: 3, registration_date: new Date().toISOString(), status: 'Registered', updated_at: new Date().toISOString(), student: mockStudents[2], scheduledCourse: mockScheduledCourses[2], overall_percentage: null, final_letter_grade: null },
-    { registration_id: 6, student_id: 5, scheduled_course_id: 4, registration_date: new Date().toISOString(), status: 'Registered', updated_at: new Date().toISOString(), student: mockStudents[1], scheduledCourse: mockScheduledCourses[3], overall_percentage: null, final_letter_grade: null }, // Sara Taye in SE301 S2
-    { registration_id: 7, student_id: 7, scheduled_course_id: 5, registration_date: new Date().toISOString(), status: 'Registered', updated_at: new Date().toISOString(), student: mockStudents[2], scheduledCourse: mockScheduledCourses[4], overall_percentage: null, final_letter_grade: null }, // Frehiwot Assefa in CE205 S1
+    // Student 1 (Abebe, user_id: 4)
+    // Spring 2024
+    { registration_id: 1, student_id: 4, scheduled_course_id: 1, registration_date: new Date().toISOString(), status: 'Registered', updated_at: new Date().toISOString(), student: mockUserProfiles.find(s => s.user_id === 4), scheduledCourse: mockScheduledCourses[0], overall_percentage: null, final_letter_grade: null, grade_points: null },
+    { registration_id: 2, student_id: 4, scheduled_course_id: 2, registration_date: new Date().toISOString(), status: 'Registered', updated_at: new Date().toISOString(), student: mockUserProfiles.find(s => s.user_id === 4), scheduledCourse: mockScheduledCourses[1], overall_percentage: null, final_letter_grade: null, grade_points: null },
+    // Fall 2023 (Completed)
+    { registration_id: 8, student_id: 4, scheduled_course_id: 6, registration_date: new Date(2023, 8, 5).toISOString(), status: 'Completed', updated_at: new Date(2023, 11, 20).toISOString(), student: mockUserProfiles.find(s => s.user_id === 4), scheduledCourse: mockScheduledCourses[5], overall_percentage: 85, final_letter_grade: 'B', grade_points: 3.0 * (mockCourses.find(c=>c.course_id===mockScheduledCourses[5].course_id)?.credits || 0) },
+    { registration_id: 9, student_id: 4, scheduled_course_id: 7, registration_date: new Date(2023, 8, 5).toISOString(), status: 'Completed', updated_at: new Date(2023, 11, 20).toISOString(), student: mockUserProfiles.find(s => s.user_id === 4), scheduledCourse: mockScheduledCourses[6], overall_percentage: 92, final_letter_grade: 'A', grade_points: 4.0 * (mockCourses.find(c=>c.course_id===mockScheduledCourses[6].course_id)?.credits || 0) },
+
+
+    // Student 2 (Sara, user_id: 5) - Inactive user but has past records
+    // Fall 2023 (Completed)
+    { registration_id: 3, student_id: 5, scheduled_course_id: 6, registration_date: new Date(2023, 8, 6).toISOString(), status: 'Completed', updated_at: new Date(2023, 11, 20).toISOString(), student: mockUserProfiles.find(s => s.user_id === 5), scheduledCourse: mockScheduledCourses[5], overall_percentage: 78, final_letter_grade: 'C', grade_points: 2.0 * (mockCourses.find(c=>c.course_id===mockScheduledCourses[5].course_id)?.credits || 0) },
+    // Spring 2024
+    { registration_id: 10, student_id: 5, scheduled_course_id: 4, registration_date: new Date().toISOString(), status: 'Registered', updated_at: new Date().toISOString(), student: mockUserProfiles.find(s => s.user_id === 5), scheduledCourse: mockScheduledCourses[3], overall_percentage: null, final_letter_grade: null, grade_points: null },
+
+
+    // Student 3 (Frehiwot, user_id: 7)
+    // Spring 2024
+    { registration_id: 4, student_id: 7, scheduled_course_id: 1, registration_date: new Date().toISOString(), status: 'Registered', updated_at: new Date().toISOString(), student: mockUserProfiles.find(s => s.user_id === 7), scheduledCourse: mockScheduledCourses[0], overall_percentage: null, final_letter_grade: null, grade_points: null },
+    { registration_id: 5, student_id: 7, scheduled_course_id: 3, registration_date: new Date().toISOString(), status: 'Registered', updated_at: new Date().toISOString(), student: mockUserProfiles.find(s => s.user_id === 7), scheduledCourse: mockScheduledCourses[2], overall_percentage: null, final_letter_grade: null, grade_points: null },
+    { registration_id: 7, student_id: 7, scheduled_course_id: 5, registration_date: new Date().toISOString(), status: 'Registered', updated_at: new Date().toISOString(), student: mockUserProfiles.find(s => s.user_id === 7), scheduledCourse: mockScheduledCourses[4], overall_percentage: null, final_letter_grade: null, grade_points: null },
+    // Fall 2023 (Completed)
+    { registration_id: 11, student_id: 7, scheduled_course_id: 6, registration_date: new Date(2023, 8, 7).toISOString(), status: 'Completed', updated_at: new Date(2023, 11, 20).toISOString(), student: mockUserProfiles.find(s => s.user_id === 7), scheduledCourse: mockScheduledCourses[5], overall_percentage: 65, final_letter_grade: 'D', grade_points: 1.0 * (mockCourses.find(c=>c.course_id===mockScheduledCourses[5].course_id)?.credits || 0) },
 ];
 
 export const mockCourseMaterials: CourseMaterial[] = [
-    { material_id: 1, scheduled_course_id: 1, title: 'Lecture 1 Slides', description: 'Introduction to Programming Concepts', material_type: 'File', file_path: '/materials/se301_lecture1.pdf', uploaded_by: 3, upload_timestamp: new Date().toISOString(), scheduledCourse: mockScheduledCourses[0], uploader: mockTeachers[0] },
-    { material_id: 2, scheduled_course_id: 1, title: 'Python Official Tutorial', description: 'Link to official Python tutorial.', material_type: 'Link', url: 'https://docs.python.org/3/tutorial/', uploaded_by: 3, upload_timestamp: new Date().toISOString(), scheduledCourse: mockScheduledCourses[0], uploader: mockTeachers[0] },
+    { material_id: 1, scheduled_course_id: 1, title: 'Lecture 1 Slides - SE301 S1', description: 'Introduction to Programming Concepts', material_type: 'File', file_path: '/materials/se301_s1_lecture1.pdf', uploaded_by: 3, upload_timestamp: new Date().toISOString() },
+    { material_id: 2, scheduled_course_id: 1, title: 'Python Official Tutorial - SE301 S1', description: 'Link to official Python tutorial.', material_type: 'Link', url: 'https://docs.python.org/3/tutorial/', uploaded_by: 3, upload_timestamp: new Date().toISOString() },
+    { material_id: 3, scheduled_course_id: 2, title: 'Intro to HTML & CSS - SE450 S1', description: 'Basic structure and styling.', material_type: 'File', file_path: '/materials/se450_s1_html_css.pdf', uploaded_by: 3, upload_timestamp: new Date().toISOString() },
+    { material_id: 4, scheduled_course_id: 6, title: 'Old Lecture Notes - SE301 S1 Fall23', description: 'Archived notes from Fall 2023.', material_type: 'File', file_path: '/materials/se301_s1_fall23_notes.pdf', uploaded_by: 3, upload_timestamp: new Date(2023,9,1).toISOString() },
 ];
 
 
@@ -192,36 +219,73 @@ export const mockAuditLogs: AuditLog[] = [
 
 // Grade Management Mock Data
 export const mockAssessments: Assessment[] = [
+  // SE301 S1 (scheduled_course_id: 1)
   { assessment_id: 1, scheduled_course_id: 1, name: 'Homework 1', max_score: 20, assessment_type: 'Homework', created_at: new Date().toISOString(), updated_at: new Date().toISOString() },
   { assessment_id: 2, scheduled_course_id: 1, name: 'Midterm Exam', max_score: 30, assessment_type: 'Exam', created_at: new Date().toISOString(), updated_at: new Date().toISOString() },
   { assessment_id: 3, scheduled_course_id: 1, name: 'Final Project', max_score: 50, assessment_type: 'Project', created_at: new Date().toISOString(), updated_at: new Date().toISOString() },
+  // SE450 S1 (scheduled_course_id: 2)
   { assessment_id: 4, scheduled_course_id: 2, name: 'Quiz 1', max_score: 10, assessment_type: 'Quiz', created_at: new Date().toISOString(), updated_at: new Date().toISOString() },
   { assessment_id: 5, scheduled_course_id: 2, name: 'Final Exam', max_score: 90, assessment_type: 'Exam', created_at: new Date().toISOString(), updated_at: new Date().toISOString() },
-  // Assessments for SE301 Section S2 (scheduled_course_id: 4)
+  // SE301 Section S2 (scheduled_course_id: 4)
   { assessment_id: 6, scheduled_course_id: 4, name: 'S2 Homework 1', max_score: 15, assessment_type: 'Homework', created_at: new Date().toISOString(), updated_at: new Date().toISOString() },
   { assessment_id: 7, scheduled_course_id: 4, name: 'S2 Midterm', max_score: 35, assessment_type: 'Exam', created_at: new Date().toISOString(), updated_at: new Date().toISOString() },
-  // Assessments for CE205 Section S1 (scheduled_course_id: 5)
+  // CE205 Section S1 (scheduled_course_id: 5)
   { assessment_id: 8, scheduled_course_id: 5, name: 'Analysis Assignment 1', max_score: 25, assessment_type: 'Assignment', created_at: new Date().toISOString(), updated_at: new Date().toISOString() },
   { assessment_id: 9, scheduled_course_id: 5, name: 'Structural Design Project', max_score: 75, assessment_type: 'Project', created_at: new Date().toISOString(), updated_at: new Date().toISOString() },
+  // SE301 S1 Fall23 (scheduled_course_id: 6) - For student past grades
+  { assessment_id: 10, scheduled_course_id: 6, name: 'Fall23 HW1', max_score: 20, assessment_type: 'Homework', created_at: new Date().toISOString(), updated_at: new Date().toISOString() },
+  { assessment_id: 11, scheduled_course_id: 6, name: 'Fall23 Midterm', max_score: 30, assessment_type: 'Exam', created_at: new Date().toISOString(), updated_at: new Date().toISOString() },
+  { assessment_id: 12, scheduled_course_id: 6, name: 'Fall23 Final', max_score: 50, assessment_type: 'Project', created_at: new Date().toISOString(), updated_at: new Date().toISOString() },
+  // EE201 S1 Fall23 (scheduled_course_id: 7) - For student past grades
+  { assessment_id: 13, scheduled_course_id: 7, name: 'Fall23 Circuit Quiz', max_score: 40, assessment_type: 'Quiz', created_at: new Date().toISOString(), updated_at: new Date().toISOString() },
+  { assessment_id: 14, scheduled_course_id: 7, name: 'Fall23 Circuit Final', max_score: 60, assessment_type: 'Exam', created_at: new Date().toISOString(), updated_at: new Date().toISOString() },
 ];
 
 export const mockStudentAssessmentScores: StudentAssessmentScore[] = [
-  // Scores for student1 (registration_id: 1) in SE301 (scheduled_course_id: 1)
+  // Scores for student1 (registration_id: 1) in SE301 S1 Spring 24 (scheduled_course_id: 1)
   { student_assessment_score_id: 1, registration_id: 1, assessment_id: 1, score_achieved: 18 },
   { student_assessment_score_id: 2, registration_id: 1, assessment_id: 2, score_achieved: 25 },
   { student_assessment_score_id: 3, registration_id: 1, assessment_id: 3, score_achieved: 45 },
-  // Scores for student3 (registration_id: 4) in SE301 (scheduled_course_id: 1)
+  // Scores for student3 (registration_id: 4) in SE301 S1 Spring 24 (scheduled_course_id: 1)
   { student_assessment_score_id: 4, registration_id: 4, assessment_id: 1, score_achieved: 15 },
   { student_assessment_score_id: 5, registration_id: 4, assessment_id: 2, score_achieved: 20 },
-  // student1 (registration_id: 2) in SE450 (scheduled_course_id: 2)
+  // student1 (registration_id: 2) in SE450 S1 Spring 24 (scheduled_course_id: 2)
   { student_assessment_score_id: 6, registration_id: 2, assessment_id: 4, score_achieved: 8 },
-  // Scores for student2 (Sara Taye, registration_id: 6) in SE301 S2 (scheduled_course_id: 4)
-  { student_assessment_score_id: 7, registration_id: 6, assessment_id: 6, score_achieved: 12 }, // S2 Homework 1
-  { student_assessment_score_id: 8, registration_id: 6, assessment_id: 7, score_achieved: 30 }, // S2 Midterm
-  // Scores for student3 (Frehiwot Assefa, registration_id: 7) in CE205 S1 (scheduled_course_id: 5)
+  // Scores for student2 (Sara Taye, registration_id: 10) in SE301 S2 Spring 24 (scheduled_course_id: 4)
+  { student_assessment_score_id: 7, registration_id: 10, assessment_id: 6, score_achieved: 12 }, // S2 Homework 1
+  { student_assessment_score_id: 8, registration_id: 10, assessment_id: 7, score_achieved: 30 }, // S2 Midterm
+  // Scores for student3 (Frehiwot Assefa, registration_id: 7) in CE205 S1 Spring 24 (scheduled_course_id: 5)
   { student_assessment_score_id: 9, registration_id: 7, assessment_id: 8, score_achieved: 22 }, // Analysis Assignment 1
   { student_assessment_score_id: 10, registration_id: 7, assessment_id: 9, score_achieved: 65 },// Structural Design Project
+  // Scores for student1 (Abebe, registration_id: 8) in SE301 S1 Fall23 (scheduled_course_id: 6) -> 85% (B)
+  { student_assessment_score_id: 11, registration_id: 8, assessment_id: 10, score_achieved: 17 }, // 17/20
+  { student_assessment_score_id: 12, registration_id: 8, assessment_id: 11, score_achieved: 25 }, // 25/30
+  { student_assessment_score_id: 13, registration_id: 8, assessment_id: 12, score_achieved: 43 }, // 43/50 Total: 85/100
+  // Scores for student1 (Abebe, registration_id: 9) in EE201 S1 Fall23 (scheduled_course_id: 7) -> 92% (A)
+  { student_assessment_score_id: 14, registration_id: 9, assessment_id: 13, score_achieved: 38 }, // 38/40
+  { student_assessment_score_id: 15, registration_id: 9, assessment_id: 14, score_achieved: 54 }, // 54/60 Total: 92/100
+  // Scores for student2 (Sara, registration_id: 3) in SE301 S1 Fall23 (scheduled_course_id: 6) -> 78% (C)
+  { student_assessment_score_id: 16, registration_id: 3, assessment_id: 10, score_achieved: 15 }, // 15/20
+  { student_assessment_score_id: 17, registration_id: 3, assessment_id: 11, score_achieved: 23 }, // 23/30
+  { student_assessment_score_id: 18, registration_id: 3, assessment_id: 12, score_achieved: 40 }, // 40/50 Total: 78/100
+  // Scores for student3 (Frehiwot, registration_id: 11) in SE301 S1 Fall23 (scheduled_course_id: 6) -> 65% (D)
+  { student_assessment_score_id: 19, registration_id: 11, assessment_id: 10, score_achieved: 12 }, // 12/20
+  { student_assessment_score_id: 20, registration_id: 11, assessment_id: 11, score_achieved: 18 }, // 18/30
+  { student_assessment_score_id: 21, registration_id: 11, assessment_id: 12, score_achieved: 35 }, // 35/50 Total: 65/100
 ];
 
 
+export const gradePointMapping: Record<string, number> = {
+  'A': 4.0,
+  'A-': 3.7,
+  'B+': 3.3,
+  'B': 3.0,
+  'B-': 2.7,
+  'C+': 2.3,
+  'C': 2.0,
+  'C-': 1.7,
+  'D+': 1.3,
+  'D': 1.0,
+  'F': 0.0,
+};
     
