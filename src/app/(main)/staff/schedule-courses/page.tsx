@@ -15,6 +15,8 @@ import { mockScheduledCourses, mockCourses, mockTeachers, mockSemesters, mockRoo
 import type { ScheduledCourse, Course, Teacher, Semester, Room, Building } from '@/types';
 import { useToast } from '@/hooks/use-toast';
 import { format } from 'date-fns';
+import ScheduleCourseForm from '@/components/scheduling/ScheduleCourseForm';
+import type { ScheduleCourseFormData } from '@/lib/schemas';
 
 interface EnrichedScheduledCourse extends ScheduledCourse {
   courseName?: string;
@@ -63,7 +65,7 @@ export default function ScheduleCoursesPage() {
         roomNumber: room?.room_number,
         buildingName: building?.name,
       };
-    });
+    }).sort((a,b) => b.scheduled_course_id - a.scheduled_course_id);
   }, [scheduledCoursesList]);
 
   const paginatedScheduledCourses = enrichedScheduledCourses.slice(
@@ -94,29 +96,58 @@ export default function ScheduleCoursesPage() {
     }
   };
   
-  const handleMockDialogSubmit = async (action: 'add' | 'edit') => {
+  const handleAddScheduledCourseSubmit = async (data: ScheduleCourseFormData) => {
     setIsSubmittingDialog(true);
+    console.log("New scheduled course data:", data);
     await new Promise(resolve => setTimeout(resolve, 1000)); // Simulate API call
-    if (action === 'add') {
-      toast({ title: 'Schedule Submitted (Mock)', description: 'New course schedule has been notionally submitted.' });
-      setIsAddDialogOpen(false);
-    } else if (action === 'edit' && selectedScheduledCourse) {
+
+    const newScheduledCourseId = Math.max(...scheduledCoursesList.map(sc => sc.scheduled_course_id), 0) + 1;
+    
+    const newScheduledCourse: ScheduledCourse = {
+        scheduled_course_id: newScheduledCourseId,
+        course_id: parseInt(data.course_id),
+        semester_id: parseInt(data.semester_id),
+        teacher_id: parseInt(data.teacher_id),
+        room_id: data.room_id ? parseInt(data.room_id) : null,
+        section_number: data.section_number,
+        max_capacity: data.max_capacity,
+        current_enrollment: 0, // New courses start with 0 enrollment
+        days_of_week: data.days_of_week,
+        start_time: data.start_time,
+        end_time: data.end_time,
+        created_at: new Date().toISOString(),
+        updated_at: new Date().toISOString(),
+    };
+
+    setScheduledCoursesList(prev => [newScheduledCourse, ...prev]);
+    
+    toast({ title: 'Course Scheduled (Mock)', description: `Course has been scheduled.` });
+    setIsSubmittingDialog(false);
+    setIsAddDialogOpen(false);
+  };
+
+  const handleEditDialogSubmit = async () => { // Placeholder for edit submit
+    setIsSubmittingDialog(true);
+    await new Promise(resolve => setTimeout(resolve, 1000));
+    if (selectedScheduledCourse) {
       toast({ title: 'Changes Saved (Mock)', description: `Changes for ${selectedScheduledCourse.courseName} have been notionally saved.` });
-      setIsEditDialogOpen(false);
-      setSelectedScheduledCourse(null);
     }
     setIsSubmittingDialog(false);
+    setIsEditDialogOpen(false);
+    setSelectedScheduledCourse(null);
   };
+
 
   const formatTime = (timeString: string | null | undefined) => {
     if (!timeString) return 'N/A';
-    // Check if timeString is already in hh:mm a format from previous processing or if it's HH:mm:ss
+    // Check if timeString is already in hh:mm a format from previous processing or if it's HH:mm or HH:mm:ss
     if (timeString.match(/(\d{1,2}:\d{2}\s*(AM|PM))/i)) return timeString;
 
     const [hours, minutes] = timeString.split(':');
     if (isNaN(parseInt(hours)) || isNaN(parseInt(minutes))) return 'Invalid Time';
     
-    const date = new Date(0, 0, 0, parseInt(hours), parseInt(minutes));
+    // Create a date object just to use formatting. Date part is irrelevant.
+    const date = new Date(2000, 0, 1, parseInt(hours), parseInt(minutes));
     return format(date, 'hh:mm a');
   };
 
@@ -144,26 +175,22 @@ export default function ScheduleCoursesPage() {
                 <PlusCircle className="mr-2 h-4 w-4" /> Schedule New Course
               </Button>
             </DialogTrigger>
-            <DialogContent className="sm:max-w-md">
+            <DialogContent className="sm:max-w-2xl">
               <DialogHeader>
                 <DialogTitle>Schedule New Course</DialogTitle>
                 <DialogDescription>
-                  The form to schedule a new course with all relevant details (course, teacher, semester, room, time, etc.) will be implemented here.
+                  Fill in the details to schedule a new course offering.
                 </DialogDescription>
               </DialogHeader>
-              {/* Placeholder for AddScheduleForm */}
-              <div className="py-4 text-center text-muted-foreground">
-                (Add Schedule Form will appear here)
-              </div>
-              <DialogFooter>
-                <Button variant="outline" onClick={() => setIsAddDialogOpen(false)} disabled={isSubmittingDialog}>
-                  Cancel
-                </Button>
-                <Button onClick={() => handleMockDialogSubmit('add')} disabled={isSubmittingDialog}>
-                  {isSubmittingDialog && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
-                  Submit (Mock)
-                </Button>
-              </DialogFooter>
+              <ScheduleCourseForm
+                onSubmit={handleAddScheduledCourseSubmit}
+                onCancel={() => setIsAddDialogOpen(false)}
+                isSubmitting={isSubmittingDialog}
+                courses={mockCourses}
+                semesters={mockSemesters}
+                teachers={mockTeachers}
+                rooms={mockRooms}
+              />
             </DialogContent>
           </Dialog>
         }
@@ -264,22 +291,22 @@ export default function ScheduleCoursesPage() {
           setIsEditDialogOpen(isOpen);
           if (!isOpen) setSelectedScheduledCourse(null);
         }}>
-          <DialogContent className="sm:max-w-md">
+          <DialogContent className="sm:max-w-2xl"> {/* Increased width for potential edit form */}
             <DialogHeader>
-              <DialogTitle>Edit Scheduled Course: {selectedScheduledCourse.courseName}</DialogTitle>
+              <DialogTitle>Edit Scheduled Course: {selectedScheduledCourse.courseCode} - {selectedScheduledCourse.courseName}</DialogTitle>
               <DialogDescription>
                 The form to edit this scheduled course (ID: {selectedScheduledCourse.scheduled_course_id}) will be implemented here.
               </DialogDescription>
             </DialogHeader>
-            {/* Placeholder for EditScheduleForm */}
-            <div className="py-4 text-center text-muted-foreground">
-              (Edit Schedule Form will appear here for {selectedScheduledCourse.courseCode} - {selectedScheduledCourse.courseName})
+            {/* Placeholder for EditScheduleForm - Replace with actual form component when ready */}
+            <div className="py-8 text-center text-muted-foreground">
+              (Edit Schedule Form will appear here)
             </div>
             <DialogFooter>
               <Button variant="outline" onClick={() => { setIsEditDialogOpen(false); setSelectedScheduledCourse(null); }} disabled={isSubmittingDialog}>
                 Cancel
               </Button>
-              <Button onClick={() => handleMockDialogSubmit('edit')} disabled={isSubmittingDialog}>
+              <Button onClick={handleEditDialogSubmit} disabled={isSubmittingDialog}>
                 {isSubmittingDialog && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
                 Save Changes (Mock)
               </Button>

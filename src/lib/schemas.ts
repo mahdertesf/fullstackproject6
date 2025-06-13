@@ -100,5 +100,26 @@ export const NewSemesterSchema = z.object({
   message: "Add/Drop period must start on or after the semester start date.",
   path: ["add_drop_start_date"],
 });
-
 export type NewSemesterFormData = z.infer<typeof NewSemesterSchema>;
+
+
+export const ScheduleCourseSchema = z.object({
+  course_id: z.string().min(1, "Course is required."),
+  semester_id: z.string().min(1, "Semester is required."),
+  teacher_id: z.string().min(1, "Teacher is required."),
+  room_id: z.string().optional(),
+  section_number: z.string().min(1, "Section number is required.").max(10, "Max 10 chars."),
+  max_capacity: z.coerce.number().int().min(1, "Capacity must be at least 1.").max(500, "Capacity seems too high."),
+  days_of_week: z.string().min(1, "Days are required (e.g., MWF, TTH).").max(15),
+  start_time: z.string().regex(/^([01]\d|2[0-3]):([0-5]\d)$/, "Invalid time format (HH:MM e.g. 09:00)."),
+  end_time: z.string().regex(/^([01]\d|2[0-3]):([0-5]\d)$/, "Invalid time format (HH:MM e.g. 10:30)."),
+}).refine(data => {
+  if (data.start_time && data.end_time) {
+    return data.end_time > data.start_time;
+  }
+  return true;
+}, {
+  message: "End time must be after start time.",
+  path: ["end_time"],
+});
+export type ScheduleCourseFormData = z.infer<typeof ScheduleCourseSchema>;
