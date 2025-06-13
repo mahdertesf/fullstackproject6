@@ -15,6 +15,8 @@ import { mockSemesters } from '@/lib/data';
 import type { Semester } from '@/types';
 import { useToast } from '@/hooks/use-toast';
 import { format } from 'date-fns';
+import AddSemesterForm from '@/components/semesters/AddSemesterForm';
+import { type NewSemesterFormData } from '@/lib/schemas';
 
 const ITEMS_PER_PAGE = 10;
 
@@ -37,7 +39,9 @@ export default function SemesterManagementPage() {
   }, [user, router]);
 
   const paginatedSemesters = useMemo(() => {
-    return semestersList.slice(
+    // Sort semesters by start date descending for recent ones first
+    const sortedSemesters = [...semestersList].sort((a, b) => new Date(b.start_date).getTime() - new Date(a.start_date).getTime());
+    return sortedSemesters.slice(
       (currentPage - 1) * ITEMS_PER_PAGE,
       currentPage * ITEMS_PER_PAGE
     );
@@ -53,10 +57,9 @@ export default function SemesterManagementPage() {
 
   const handleOpenEditDialog = (semester: Semester) => {
     setEditingSemester(semester);
-    setIsEditDialogOpen(true);
-    // For now, the edit form is just a placeholder
-    toast({ title: 'Edit Semester (Mock)', description: `Dialog to edit ${semester.name} would open here.` });
-    setIsEditDialogOpen(false); // Close immediately as it's a placeholder
+    // setIsEditDialogOpen(true); // This would open an edit form
+    toast({ title: 'Edit Semester (Mock)', description: `Dialog to edit ${semester.name} would open here. Not yet implemented.` });
+    // setIsEditDialogOpen(false); // Close immediately as it's a placeholder for now
   };
 
   const handleDeleteSemester = (semesterId: number) => {
@@ -69,14 +72,36 @@ export default function SemesterManagementPage() {
     toast({ title: 'Semester Deleted (Mock)', description: `Semester ${semesterToDelete.name} has been removed.` });
   };
   
-  const handleAddSemester = async () => {
-    // Placeholder for adding a new semester - will need a form
+  const handleAddSemesterSubmit = async (data: NewSemesterFormData) => {
     setIsSubmitting(true);
-    await new Promise(resolve => setTimeout(resolve, 1000));
-    toast({ title: 'Add Semester (Mock)', description: 'A new semester would be added here after filling a form.'});
+    console.log("New semester data:", data);
+    await new Promise(resolve => setTimeout(resolve, 1000)); // Simulate API call
+
+    const newSemesterId = Math.max(...semestersList.map(s => s.semester_id), 0) + 1;
+    const newSemester: Semester = {
+      semester_id: newSemesterId,
+      name: data.name,
+      academic_year: data.academic_year,
+      term: data.term,
+      start_date: format(data.start_date, 'yyyy-MM-dd'),
+      end_date: format(data.end_date, 'yyyy-MM-dd'),
+      registration_start_date: data.registration_start_date.toISOString(),
+      registration_end_date: data.registration_end_date.toISOString(),
+      add_drop_start_date: data.add_drop_start_date.toISOString(),
+      add_drop_end_date: data.add_drop_end_date.toISOString(),
+      created_at: new Date().toISOString(),
+      updated_at: new Date().toISOString(),
+    };
+
+    setSemestersList(prev => [newSemester, ...prev]);
+    
+    toast({
+      title: 'Semester Created (Mock)',
+      description: `Semester ${data.name} has been created.`,
+    });
     setIsSubmitting(false);
     setIsAddDialogOpen(false);
-  }
+  };
 
 
   if (!user || (user.role !== 'Staff' && !user.isSuperAdmin)) {
@@ -102,26 +127,18 @@ export default function SemesterManagementPage() {
                 <PlusCircle className="mr-2 h-4 w-4" /> Add New Semester
               </Button>
             </DialogTrigger>
-            <DialogContent className="sm:max-w-[600px]">
+            <DialogContent className="sm:max-w-2xl">
               <DialogHeader>
-                <DialogTitle>Add New Semester (Mock)</DialogTitle>
+                <DialogTitle>Add New Semester</DialogTitle>
                 <DialogDescription>
-                  Semester creation form will be implemented here.
+                  Fill in the details to create a new academic semester.
                 </DialogDescription>
               </DialogHeader>
-              {/* Placeholder for AddSemesterForm */}
-              <div className="py-4 text-center text-muted-foreground">
-                <p>Form to add a new semester will go here.</p>
-              </div>
-               <div className="flex justify-end space-x-2 pt-4">
-                <Button type="button" variant="outline" onClick={() => setIsAddDialogOpen(false)} disabled={isSubmitting}>
-                  Cancel
-                </Button>
-                <Button onClick={handleAddSemester} disabled={isSubmitting}>
-                  {isSubmitting ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : null}
-                  Create Semester (Mock)
-                </Button>
-              </div>
+              <AddSemesterForm
+                onSubmit={handleAddSemesterSubmit}
+                onCancel={() => setIsAddDialogOpen(false)}
+                isSubmitting={isSubmitting}
+              />
             </DialogContent>
           </Dialog>
         }

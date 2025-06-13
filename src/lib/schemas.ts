@@ -71,3 +71,34 @@ export const EditCourseSchema = z.object({
   department_id: z.string({ required_error: "Department is required."}).min(1, "Department is required."),
 });
 export type EditCourseFormData = z.infer<typeof EditCourseSchema>;
+
+export const NewSemesterSchema = z.object({
+  name: z.string().min(3, "Semester name must be at least 3 characters."),
+  academic_year: z.coerce.number()
+    .min(new Date().getFullYear() - 5, `Year cannot be too far in the past.`)
+    .max(new Date().getFullYear() + 5, `Year cannot be too far in the future.`),
+  term: z.enum(['Fall', 'Spring', 'Summer', 'Winter'], { required_error: "Term is required."}),
+  start_date: z.date({ required_error: "Start date is required."}),
+  end_date: z.date({ required_error: "End date is required."}),
+  registration_start_date: z.date({ required_error: "Registration start date is required."}),
+  registration_end_date: z.date({ required_error: "Registration end date is required."}),
+  add_drop_start_date: z.date({ required_error: "Add/Drop start date is required."}),
+  add_drop_end_date: z.date({ required_error: "Add/Drop end date is required."}),
+}).refine(data => data.end_date > data.start_date, {
+  message: "End date must be after start date.",
+  path: ["end_date"],
+}).refine(data => data.registration_end_date > data.registration_start_date, {
+  message: "Registration end date must be after registration start date.",
+  path: ["registration_end_date"],
+}).refine(data => data.add_drop_end_date > data.add_drop_start_date, {
+  message: "Add/Drop end date must be after Add/Drop start date.",
+  path: ["add_drop_end_date"],
+}).refine(data => data.registration_start_date <= data.start_date, {
+  message: "Registration start date must be on or before the semester start date.",
+  path: ["registration_start_date"],
+}).refine(data => data.add_drop_start_date >= data.start_date, {
+  message: "Add/Drop period must start on or after the semester start date.",
+  path: ["add_drop_start_date"],
+});
+
+export type NewSemesterFormData = z.infer<typeof NewSemesterSchema>;
