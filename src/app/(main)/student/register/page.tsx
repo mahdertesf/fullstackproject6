@@ -13,7 +13,7 @@ import {
   mockUserProfiles,
   mockPrerequisites
 } from '@/lib/data';
-import type { UserProfile, ScheduledCourse, Course, Semester, Registration, Prerequisite } from '@/types';
+import type { UserProfile, ScheduledCourse, Course, Semester, Registration } from '@/types';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle, CardFooter } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
@@ -27,7 +27,8 @@ interface AvailableCourseForRegistration extends ScheduledCourse {
   prerequisitesMet: boolean;
   prerequisiteCourses?: Course[];
   isRegistered: boolean;
-  canRegister: boolean; // capacity, prerequisites
+  canRegister: boolean; 
+  canDrop: boolean;
 }
 
 export default function StudentCourseRegistrationPage() {
@@ -37,26 +38,37 @@ export default function StudentCourseRegistrationPage() {
 
   const [isLoading, setIsLoading] = useState(true);
   const [selectedSemesterId, setSelectedSemesterId] = useState<string | undefined>(undefined);
+  const [selectedSemester, setSelectedSemester] = useState<Semester | null>(null);
   const [availableCourses, setAvailableCourses] = useState<AvailableCourseForRegistration[]>([]);
   const [studentRegistrations, setStudentRegistrations] = useState<Registration[]>([]);
 
+  const now = useMemo(() => new Date(), []);
+
   // Determine current and future semesters for selection
-  const availableSemesters = useMemo(() => {
-    const now = new Date();
+  const availableSemestersForRegistration = useMemo(() => {
     return mockSemesters
-      .filter(sem => new Date(sem.registration_end_date) >= now) // Only semesters open for registration
+      .filter(sem => new Date(sem.registration_end_date) >= now) 
       .sort((a, b) => new Date(a.start_date).getTime() - new Date(b.start_date).getTime());
-  }, []);
+  }, [now]);
 
   useEffect(() => {
-    if (availableSemesters.length > 0 && !selectedSemesterId) {
-      setSelectedSemesterId(String(availableSemesters[0].semester_id));
+    if (availableSemestersForRegistration.length > 0 && !selectedSemesterId) {
+      setSelectedSemesterId(String(availableSemestersForRegistration[0].semester_id));
     }
-  }, [availableSemesters, selectedSemesterId]);
+  }, [availableSemestersForRegistration, selectedSemesterId]);
+
+  useEffect(() => {
+    if (selectedSemesterId) {
+      const foundSemester = mockSemesters.find(s => s.semester_id === parseInt(selectedSemesterId));
+      setSelectedSemester(foundSemester || null);
+    } else {
+      setSelectedSemester(null);
+    }
+  }, [selectedSemesterId]);
 
 
   useEffect(() => {
-    if (user && user.role === 'Student' && selectedSemesterId) {
+    if (user && user.role === 'Student' && selectedSemesterId && selectedSemester) {
       setIsLoading(true);
       const studentUser = user as UserProfile;
       const currentSemesterNumId = parseInt(selectedSemesterId);
@@ -66,7 +78,6 @@ export default function StudentCourseRegistrationPage() {
       );
       setStudentRegistrations(studentRegsForSemester);
       
-      // Get student's completed courses for prerequisite checking
       const completedCourseIds = mockRegistrations
         .filter(reg => reg.student_id === studentUser.user_id && reg.status === 'Completed')
         .map(reg => reg.scheduledCourse?.course_id)
@@ -76,10 +87,15 @@ export default function StudentCourseRegistrationPage() {
         .filter(sc => sc.semester_id === currentSemesterNumId)
         .map(sc => {
           const courseDetails = mockCourses.find(c => c.course_id === sc.course_id);
+          
+          // Department check
+          if (studentUser.department_id && courseDetails?.department_id !== studentUser.department_id) {
+            return null; // Student not in the course's department
+          }
+
           const teacherDetails = mockUserProfiles.find(t => t.user_id === sc.teacher_id);
           const isRegistered = studentRegsForSemester.some(reg => reg.scheduled_course_id === sc.scheduled_course_id);
           
-          // Prerequisite Check
           const coursePrereqs = mockPrerequisites.filter(p => p.course_id === sc.course_id);
           let prerequisitesMet = true;
           let prerequisiteCourses: Course[] = [];
@@ -88,7 +104,11 @@ export default function StudentCourseRegistrationPage() {
             prerequisitesMet = coursePrereqs.every(p => completedCourseIds.includes(p.prerequisite_course_id));
           }
           
-          const canRegister = !isRegistered && prerequisitesMet && sc.current_enrollment < sc.max_capacity;
+          const isRegistrationOpen = new Date(selectedSemester.registration_end_date) >= now;
+          const isAddDropOpen = new Date(selectedSemester.add_drop_end_date) >= now;
+
+          const canRegister = !isRegistered && prerequisitesMet && sc.current_enrollment < sc.max_capacity && isRegistrationOpen;
+          const canDrop = isRegistered && isAddDropOpen;
 
           return {
             ...sc,
@@ -98,8 +118,9 @@ export default function StudentCourseRegistrationPage() {
             prerequisitesMet,
             prerequisiteCourses,
             canRegister,
+            canDrop,
           };
-        });
+        }).filter(Boolean) as AvailableCourseForRegistration[]; // filter(Boolean) removes nulls
       
       setAvailableCourses(coursesForSemester);
       setIsLoading(false);
@@ -107,8 +128,11 @@ export default function StudentCourseRegistrationPage() {
       router.replace('/login');
     } else if (user && user.role !== 'Student') {
       router.replace('/dashboard');
+    } else if (!selectedSemesterId || !selectedSemester) {
+      setAvailableCourses([]); // Clear courses if no semester selected
+      setIsLoading(false);
     }
-  }, [user, router, selectedSemesterId]);
+  }, [user, router, selectedSemesterId, selectedSemester, now]);
 
   const handleRegister = (scheduledCourseId: number) => {
     if (!user || !selectedSemesterId) return;
@@ -116,7 +140,6 @@ export default function StudentCourseRegistrationPage() {
     const courseToRegister = availableCourses.find(c => c.scheduled_course_id === scheduledCourseId);
 
     if (courseToRegister && courseToRegister.canRegister) {
-      // Mock registration
       const newRegistrationId = Math.max(0, ...mockRegistrations.map(r => r.registration_id)) + 1;
       const newReg: Registration = {
         registration_id: newRegistrationId,
@@ -130,13 +153,11 @@ export default function StudentCourseRegistrationPage() {
       };
       mockRegistrations.push(newReg);
 
-      // Update local state to reflect registration
       setAvailableCourses(prev => prev.map(c => 
-        c.scheduled_course_id === scheduledCourseId ? { ...c, isRegistered: true, canRegister: false, current_enrollment: c.current_enrollment + 1 } : c
+        c.scheduled_course_id === scheduledCourseId ? { ...c, isRegistered: true, canRegister: false, current_enrollment: c.current_enrollment + 1, canDrop: new Date(selectedSemester!.add_drop_end_date) >= now } : c
       ));
       setStudentRegistrations(prev => [...prev, newReg]);
       
-      // Update mockScheduledCourses enrollment
       const scIndex = mockScheduledCourses.findIndex(sc => sc.scheduled_course_id === scheduledCourseId);
       if (scIndex > -1) {
         mockScheduledCourses[scIndex].current_enrollment +=1;
@@ -144,27 +165,31 @@ export default function StudentCourseRegistrationPage() {
 
       toast({ title: 'Registration Successful (Mock)', description: `You have been registered for ${courseToRegister.courseDetails?.title}.` });
     } else {
-      toast({ variant: 'destructive', title: 'Registration Failed', description: 'Cannot register for this course at this time.' });
+      toast({ variant: 'destructive', title: 'Registration Failed', description: 'Cannot register for this course. It might be full, prerequisites not met, or registration deadline passed.' });
     }
   };
   
   const handleDrop = (scheduledCourseId: number) => {
-     if (!user || !selectedSemesterId) return;
+     if (!user || !selectedSemester || !selectedSemesterId) return;
       const studentUser = user as UserProfile;
       const regToDrop = studentRegistrations.find(r => r.scheduled_course_id === scheduledCourseId);
       const courseToUpdate = availableCourses.find(c => c.scheduled_course_id === scheduledCourseId);
 
-
-      if (regToDrop) {
-        // Mock drop
+      if (regToDrop && new Date(selectedSemester.add_drop_end_date) >= now) {
         const regIndex = mockRegistrations.findIndex(r => r.registration_id === regToDrop.registration_id);
         if (regIndex > -1) {
-            mockRegistrations.splice(regIndex, 1); // Remove from global mock
+            mockRegistrations.splice(regIndex, 1); 
         }
 
         setStudentRegistrations(prev => prev.filter(r => r.registration_id !== regToDrop.registration_id));
         setAvailableCourses(prev => prev.map(c => 
-            c.scheduled_course_id === scheduledCourseId ? { ...c, isRegistered: false, canRegister: c.prerequisitesMet && c.current_enrollment -1 < c.max_capacity, current_enrollment: Math.max(0, c.current_enrollment -1) } : c
+            c.scheduled_course_id === scheduledCourseId ? { 
+                ...c, 
+                isRegistered: false, 
+                canRegister: c.prerequisitesMet && (c.current_enrollment -1 < c.max_capacity) && new Date(selectedSemester.registration_end_date) >= now,
+                current_enrollment: Math.max(0, c.current_enrollment -1),
+                canDrop: false
+            } : c
         ));
 
         const scIndex = mockScheduledCourses.findIndex(sc => sc.scheduled_course_id === scheduledCourseId);
@@ -172,6 +197,8 @@ export default function StudentCourseRegistrationPage() {
             mockScheduledCourses[scIndex].current_enrollment = Math.max(0, mockScheduledCourses[scIndex].current_enrollment -1);
         }
         toast({ title: 'Course Dropped (Mock)', description: `You have dropped ${courseToUpdate?.courseDetails?.title}.` });
+      } else {
+        toast({ variant: 'destructive', title: 'Drop Failed', description: 'Cannot drop this course. Add/Drop period may have ended.' });
       }
   };
 
@@ -196,15 +223,14 @@ export default function StudentCourseRegistrationPage() {
 
       <Card>
         <CardHeader>
-          <FormItem>
             <FormLabel>Select Semester for Registration</FormLabel>
             <Select value={selectedSemesterId} onValueChange={setSelectedSemesterId}>
               <SelectTrigger className="w-full md:w-1/3">
                 <SelectValue placeholder="Select a semester" />
               </SelectTrigger>
               <SelectContent>
-                {availableSemesters.length > 0 ? (
-                  availableSemesters.map(sem => (
+                {availableSemestersForRegistration.length > 0 ? (
+                  availableSemestersForRegistration.map(sem => (
                     <SelectItem key={sem.semester_id} value={String(sem.semester_id)}>
                       {sem.name} ({sem.academic_year})
                     </SelectItem>
@@ -214,17 +240,20 @@ export default function StudentCourseRegistrationPage() {
                 )}
               </SelectContent>
             </Select>
-          </FormItem>
         </CardHeader>
       </Card>
       
       {isLoading && <p className="text-center text-muted-foreground">Loading courses...</p>}
 
-      {!isLoading && availableSemesters.length === 0 && (
+      {!isLoading && availableSemestersForRegistration.length === 0 && (
          <Card><CardContent className="py-6 text-center text-muted-foreground">No semesters are currently open for registration.</CardContent></Card>
       )}
+      
+      {!isLoading && selectedSemesterId && !selectedSemester && (
+          <Card><CardContent className="py-6 text-center text-muted-foreground">Please select a valid semester.</CardContent></Card>
+      )}
 
-      {!isLoading && selectedSemesterId && availableCourses.length > 0 && (
+      {!isLoading && selectedSemester && availableCourses.length > 0 && (
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
           {availableCourses.map(sc => (
             <Card key={sc.scheduled_course_id} className="flex flex-col">
@@ -252,11 +281,20 @@ export default function StudentCourseRegistrationPage() {
                  {sc.current_enrollment >= sc.max_capacity && !sc.isRegistered && (
                      <p className="text-xs text-destructive flex items-center gap-1"><Info className="h-4 w-4"/>Section is full.</p>
                  )}
+                 {selectedSemester && new Date(selectedSemester.registration_end_date) < now && !sc.isRegistered && (
+                    <p className="text-xs text-destructive flex items-center gap-1"><Info className="h-4 w-4"/>Registration deadline passed.</p>
+                 )}
               </CardContent>
               <CardFooter>
                 {sc.isRegistered ? (
-                   <Button variant="destructive" className="w-full" onClick={() => handleDrop(sc.scheduled_course_id)}>
+                   <Button 
+                    variant="destructive" 
+                    className="w-full" 
+                    onClick={() => handleDrop(sc.scheduled_course_id)}
+                    disabled={!sc.canDrop}
+                   >
                      <XCircle className="mr-2 h-4 w-4" /> Drop Course
+                     {!sc.canDrop && selectedSemester && new Date(selectedSemester.add_drop_end_date) < now && <span className="text-xs ml-1">(Deadline Passed)</span>}
                    </Button>
                 ) : (
                   <Button 
@@ -272,11 +310,9 @@ export default function StudentCourseRegistrationPage() {
           ))}
         </div>
       )}
-      {!isLoading && selectedSemesterId && availableCourses.length === 0 && (
-         <Card><CardContent className="py-6 text-center text-muted-foreground">No courses available for registration in this semester, or all are full/prerequisites not met.</CardContent></Card>
+      {!isLoading && selectedSemester && availableCourses.length === 0 && (
+         <Card><CardContent className="py-6 text-center text-muted-foreground">No courses available in your department for registration in this semester, or all are full/prerequisites not met.</CardContent></Card>
       )}
-
-
     </div>
   );
 }

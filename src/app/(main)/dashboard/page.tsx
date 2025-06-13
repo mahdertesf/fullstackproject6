@@ -1,12 +1,16 @@
+
 'use client';
 
 import { useAuthStore } from '@/store/authStore';
 import PageHeader from '@/components/shared/PageHeader';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
-import { Home, User, BookOpen, BarChart3 } from 'lucide-react';
+import { Home, User, BookOpen, BarChart3, Speaker as SpeakerIcon } from 'lucide-react'; // Renamed Speaker to SpeakerIcon
 import Image from 'next/image';
 import Link from 'next/link';
 import { Button } from '@/components/ui/button';
+import { mockAnnouncements } from '@/lib/data';
+import { useMemo } from 'react';
+import { format } from 'date-fns';
 
 // Placeholder components for role-specific dashboard content
 const AdminDashboard = () => (
@@ -99,41 +103,71 @@ const TeacherDashboard = () => (
   </div>
 );
 
-const StudentDashboard = () => (
- <div className="grid gap-6 md:grid-cols-2">
-    <Card>
-      <CardHeader>
-        <CardTitle>My Schedule - Spring 2024</CardTitle>
-        <CardDescription>Your currently registered courses.</CardDescription>
-      </CardHeader>
-      <CardContent>
-         <ul className="space-y-2">
-          <li>SE301 - Introduction to Programming</li>
-          <li>SE450 - Web Development</li>
-        </ul>
-        <Link href="/student/my-schedule"><Button variant="link" className="p-0 mt-2">View full schedule</Button></Link>
-      </CardContent>
-    </Card>
-    <Card>
-      <CardHeader>
-        <CardTitle>Upcoming Deadlines</CardTitle>
-        <CardDescription>Assessments and tasks due soon.</CardDescription>
-      </CardHeader>
-      <CardContent>
-        <p>Homework 1 (SE301) - Due in 3 days</p>
-        <p>Project Proposal (SE450) - Due in 1 week</p>
-      </CardContent>
-    </Card>
-    <Card className="md:col-span-2">
-      <CardHeader>
-        <CardTitle>Recent Announcements</CardTitle>
-      </CardHeader>
-      <CardContent>
-        <p>Midterm Registration Deadline Approaching - Mar 15, 2024</p>
-      </CardContent>
-    </Card>
-  </div>
-);
+const StudentDashboard = () => {
+  const now = useMemo(() => new Date(), []);
+  const recentAnnouncements = useMemo(() => {
+    return mockAnnouncements
+      .filter(ann => 
+        ann.status === 'Published' &&
+        (ann.target_audience === 'Students' || ann.target_audience === 'All Users') &&
+        new Date(ann.publish_date || 0) <= now &&
+        (!ann.expiry_date || new Date(ann.expiry_date) >= now)
+      )
+      .sort((a, b) => new Date(b.publish_date || 0).getTime() - new Date(a.publish_date || 0).getTime())
+      .slice(0, 3); // Show top 3 recent
+  }, [now]);
+
+  return (
+    <div className="grid gap-6 md:grid-cols-2">
+      <Card>
+        <CardHeader>
+          <CardTitle>My Schedule - Spring 2024</CardTitle>
+          <CardDescription>Your currently registered courses.</CardDescription>
+        </CardHeader>
+        <CardContent>
+          <ul className="space-y-2">
+            <li>SE301 - Introduction to Programming</li>
+            <li>SE450 - Web Development</li>
+          </ul>
+          <Link href="/student/my-schedule"><Button variant="link" className="p-0 mt-2">View full schedule</Button></Link>
+        </CardContent>
+      </Card>
+      <Card>
+        <CardHeader>
+          <CardTitle>Upcoming Deadlines</CardTitle>
+          <CardDescription>Assessments and tasks due soon.</CardDescription>
+        </CardHeader>
+        <CardContent>
+          <p>Homework 1 (SE301) - Due in 3 days</p>
+          <p>Project Proposal (SE450) - Due in 1 week</p>
+        </CardContent>
+      </Card>
+      <Card className="md:col-span-2">
+        <CardHeader>
+          <CardTitle className="flex items-center"><SpeakerIcon className="mr-2 h-5 w-5 text-primary" />Recent Announcements</CardTitle>
+        </CardHeader>
+        <CardContent>
+          {recentAnnouncements.length > 0 ? (
+            <ul className="space-y-3">
+              {recentAnnouncements.map(ann => (
+                <li key={ann.announcement_id} className="border-b pb-2 last:border-b-0">
+                  <h4 className="font-semibold text-sm">{ann.title}</h4>
+                  <p className="text-xs text-muted-foreground">
+                    Published: {format(new Date(ann.publish_date || 0), 'MMM dd, yyyy')}
+                  </p>
+                  <p className="text-sm mt-1 line-clamp-2">{ann.content}</p>
+                </li>
+              ))}
+            </ul>
+          ) : (
+            <p className="text-muted-foreground">No recent announcements for you.</p>
+          )}
+           {/* <Button variant="link" className="p-0 mt-3 text-sm">View all announcements</Button> */}
+        </CardContent>
+      </Card>
+    </div>
+  );
+};
 
 
 export default function DashboardPage() {
