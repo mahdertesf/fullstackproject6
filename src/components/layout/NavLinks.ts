@@ -14,7 +14,7 @@ import {
   GraduationCap, 
   Edit3, 
   Megaphone, 
-  ListChecks, 
+  // ListChecks, // Icon for Audit Log, removed
   HardHat, 
   UserCircle, 
   Layers 
@@ -38,7 +38,7 @@ export const navLinks: NavLink[] = [
   { href: '/student/my-schedule', label: 'My Schedule', icon: FileText, roles: ['Student'] },
   { href: '/student/register', label: 'Course Registration', icon: Edit3, roles: ['Student'] },
   { href: '/student/transcript', label: 'My Transcript', icon: GraduationCap, roles: ['Student'] },
-  { href: '/study-guide', label: 'Materials & AI Guide', icon: Layers, roles: ['Student'] }, // Renamed and new icon
+  { href: '/study-guide', label: 'Materials & AI Guide', icon: Layers, roles: ['Student'] },
 
   // Teacher specific
   { href: '/teacher/my-courses', label: 'My Courses', icon: BookOpen, roles: ['Teacher'] },
@@ -57,7 +57,7 @@ export const navLinks: NavLink[] = [
   { href: '/admin/full-user-management', label: 'Full User Management', icon: Users, roles: 'superadmin' },
   { href: '/admin/department-management', label: 'Manage Departments', icon: Building, roles: 'superadmin' },
   { href: '/admin/infrastructure', label: 'Campus Infrastructure', icon: HardHat, roles: 'superadmin' },
-  { href: '/admin/audit-log', label: 'Audit Log', icon: ListChecks, roles: 'superadmin' },
+  // { href: '/admin/audit-log', label: 'Audit Log', icon: ListChecks, roles: 'superadmin' }, // Audit Log link removed
   { href: '/admin/settings', label: 'Admin Settings', icon: Settings, roles: 'superadmin' },
 ];
 
@@ -65,7 +65,6 @@ export const getFilteredNavLinks = (role: UserRole, isSuperAdmin: boolean = fals
   return navLinks.filter(link => {
     if (link.roles === 'all') return true;
     if (isSuperAdmin && link.roles === 'superadmin') return true;
-    // SuperAdmins should also see 'Staff' role links
     if (isSuperAdmin && Array.isArray(link.roles) && link.roles.includes('Staff')) return true;
     return Array.isArray(link.roles) && link.roles.includes(role);
   }).map(link => ({
@@ -80,12 +79,12 @@ export const getFilteredNavLinks = (role: UserRole, isSuperAdmin: boolean = fals
       const order = [
         'Dashboard', 'My Profile', 
         'My Schedule', 'Course Catalog', 'Course Registration', 'My Transcript', 
-        'Departments', 'Materials & AI Guide', // Updated label
+        'Departments', 'Materials & AI Guide',
         'My Courses', 'Post Announcement', 'View Announcements', 
         'Create Announcement', 
         'Manage Users', 'Full User Management', 
         'Manage Courses', 'Manage Semesters', 'Schedule Courses', 
-        'Manage Departments', 'Campus Infrastructure', 'Audit Log', 'Admin Settings'
+        'Manage Departments', 'Campus Infrastructure', /*'Audit Log',*/ 'Admin Settings' // Audit Log removed from sort order
       ];
       return order.indexOf(a.label) - order.indexOf(b.label);
   });

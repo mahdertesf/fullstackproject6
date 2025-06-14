@@ -1,4 +1,3 @@
-
 import { PrismaClient, UserRole } from '@prisma/client';
 
 const prisma = new PrismaClient();
@@ -9,12 +8,7 @@ async function main() {
   // --- Create Super Admin User ---
   const adminUsername = 'admin';
   const adminEmail = 'admin@cotbe.edu';
-  // IMPORTANT: In a real application, ALWAYS HASH PASSWORDS before storing them.
-  // For this seed script, we are using a plaintext password for simplicity.
-  // Example using bcryptjs (install with `npm install bcryptjs @types/bcryptjs`):
-  // const bcrypt = require('bcryptjs');
-  // const hashedPassword = bcrypt.hashSync('adminPass123!', 10);
-  const adminPassword = 'adminPass123!'; // Replace with a strong password if you intend to keep this user
+  const adminPassword = 'adminPass123!';
 
   let adminUser = await prisma.user.findUnique({
     where: { username: adminUsername },
@@ -25,7 +19,7 @@ async function main() {
       data: {
         username: adminUsername,
         email: adminEmail,
-        password_hash: adminPassword, // Store as plaintext for now; HASH IN PRODUCTION!
+        password_hash: adminPassword,
         role: UserRole.Staff,
         first_name: 'Super',
         last_name: 'Admin',
@@ -34,7 +28,6 @@ async function main() {
         staff_profile: {
           create: {
             job_title: 'Portal Administrator',
-            // Add other staff profile fields if necessary, ensuring they have defaults or are nullable
           },
         },
       },
@@ -45,29 +38,28 @@ async function main() {
     console.log(`Created super admin user: ${adminUser.username} with ID: ${adminUser.user_id}`);
   } else {
     console.log(`Admin user "${adminUsername}" already exists.`);
-    // Optionally update the admin user if it exists, e.g., ensure is_super_admin is true
     adminUser = await prisma.user.update({
       where: { user_id: adminUser.user_id },
       data: {
         is_super_admin: true,
-        role: UserRole.Staff, // Ensure role is Staff
-        password_hash: adminPassword, // Re-set password if needed (HASH IN PRODUCTION)
+        role: UserRole.Staff,
+        password_hash: adminPassword,
         staff_profile: {
-          upsert: { // Create staff profile if it doesn't exist, update if it does
-            where: { staff_id: adminUser.user_id }, // Assuming staff_id is user_id
+          upsert: {
+            where: { staff_id: adminUser.user_id },
             create: { job_title: 'Portal Administrator' },
             update: { job_title: 'Portal Administrator' },
-          }
-        }
+          },
+        },
       },
-       include: {
+      include: {
         staff_profile: true,
       },
     });
-     console.log(`Updated super admin user: ${adminUser.username}.`);
+    console.log(`Updated super admin user: ${adminUser.username}.`);
   }
 
-  // --- Create Departments (Example) ---
+  // --- Create Departments ---
   const departmentsToCreate = [
     { name: 'Software Engineering', description: 'Department of Software Engineering' },
     { name: 'Civil Engineering', description: 'Department of Civil Engineering' },
@@ -86,51 +78,102 @@ async function main() {
     createdDepartments.push(department);
     console.log(`Created/Ensured department: ${department.name}`);
   }
-  
+
   const firstDepartmentId = createdDepartments.length > 0 ? createdDepartments[0].department_id : undefined;
   if (!firstDepartmentId) {
     console.warn("No departments were created or found. Skipping user creation that depends on departments.");
   }
 
-
-  // --- Create Semesters (Example) ---
+  // --- Create Semesters ---
   const currentYear = new Date().getFullYear();
   const semestersToCreate = [
-    { name: `Fall ${currentYear}`, academic_year: currentYear, term: 'Fall', start_date: new Date(`${currentYear}-09-01`), end_date: new Date(`${currentYear}-12-20`), registration_start_date: new Date(`${currentYear}-08-15`), registration_end_date: new Date(`${currentYear}-09-10`), add_drop_start_date: new Date(`${currentYear}-09-01`), add_drop_end_date: new Date(`${currentYear}-09-15`) },
-    { name: `Spring ${currentYear + 1}`, academic_year: currentYear + 1, term: 'Spring', start_date: new Date(`${currentYear + 1}-01-15`), end_date: new Date(`${currentYear + 1}-05-10`), registration_start_date: new Date(`${currentYear + 1}-01-01`), registration_end_date: new Date(`${currentYear + 1}-01-20`), add_drop_start_date: new Date(`${currentYear + 1}-01-15`), add_drop_end_date: new Date(`${currentYear + 1}-01-30`) },
+    {
+      name: `Fall ${currentYear}`,
+      academic_year: currentYear,
+      term: 'Fall',
+      start_date: new Date(`${currentYear}-09-01`),
+      end_date: new Date(`${currentYear}-12-20`),
+      registration_start_date: new Date(`${currentYear}-08-15`),
+      registration_end_date: new Date(`${currentYear}-09-10`),
+      add_drop_start_date: new Date(`${currentYear}-09-01`),
+      add_drop_end_date: new Date(`${currentYear}-09-15`),
+    },
+    {
+      name: `Spring ${currentYear + 1}`,
+      academic_year: currentYear + 1,
+      term: 'Spring',
+      start_date: new Date(`${currentYear + 1}-01-15`),
+      end_date: new Date(`${currentYear + 1}-05-10`),
+      registration_start_date: new Date(`${currentYear + 1}-01-01`),
+      registration_end_date: new Date(`${currentYear + 1}-01-20`),
+      add_drop_start_date: new Date(`${currentYear + 1}-01-15`),
+      add_drop_end_date: new Date(`${currentYear + 1}-01-30`),
+    },
   ];
 
   for (const semData of semestersToCreate) {
     const existingSemester = await prisma.semester.findFirst({
-        where: { name: semData.name },
+      where: { name: semData.name },
     });
 
     if (!existingSemester) {
-        const semester = await prisma.semester.create({ data: semData });
-        console.log(`Created semester: ${semester.name}`);
+      const semester = await prisma.semester.create({ data: semData });
+      console.log(`Created semester: ${semester.name}`);
     } else {
-        console.log(`Semester "${semData.name}" already exists.`);
+      console.log(`Semester "${semData.name}" already exists.`);
     }
   }
 
-
   // --- Create example student, teacher, and staff users ---
-  // Ensure department_id is valid; for this example, we'll use the ID of the first department created.
   if (firstDepartmentId) {
     const usersToCreate = [
-      { username: 'student1', email: 'student1@example.com', password_hash: 'studentPass123', role: UserRole.Student, first_name: 'Student', last_name: 'One', is_active: true, is_super_admin: false, department_id: firstDepartmentId },
-      { username: 'teacher1', email: 'teacher1@example.com', password_hash: 'teacherPass123', role: UserRole.Teacher, first_name: 'Teacher', last_name: 'One', is_active: true, is_super_admin: false, department_id: firstDepartmentId },
-      { username: 'staff1', email: 'staff1@example.com', password_hash: 'staffPass123', role: UserRole.Staff, first_name: 'Staff', last_name: 'One', is_active: true, is_super_admin: false },
+      {
+        username: 'student1',
+        email: 'student1@example.com',
+        password_hash: 'studentPass123',
+        role: UserRole.Student,
+        first_name: 'Student',
+        last_name: 'One',
+        is_active: true,
+        is_super_admin: false,
+        department_id: firstDepartmentId,
+      },
+      {
+        username: 'teacher1',
+        email: 'teacher1@example.com',
+        password_hash: 'teacherPass123',
+        role: UserRole.Teacher,
+        first_name: 'Teacher',
+        last_name: 'One',
+        is_active: true,
+        is_super_admin: false,
+        department_id: firstDepartmentId,
+      },
+      {
+        username: 'staff1',
+        email: 'staff1@example.com',
+        password_hash: 'staffPass123',
+        role: UserRole.Staff,
+        first_name: 'Staff',
+        last_name: 'One',
+        is_active: true,
+        is_super_admin: false,
+      },
     ];
 
     for (const userData of usersToCreate) {
       let user = await prisma.user.findUnique({ where: { username: userData.username } });
+
       if (!user) {
         const profileData: any = {};
         if (userData.role === UserRole.Student) {
-          profileData.student_profile = { create: { enrollment_date: new Date(), department_id: userData.department_id } };
+          profileData.student_profile = {
+            create: { enrollment_date: new Date(), department_id: userData.department_id },
+          };
         } else if (userData.role === UserRole.Teacher) {
-          profileData.teacher_profile = { create: { department_id: userData.department_id } };
+          profileData.teacher_profile = {
+            create: { department_id: userData.department_id },
+          };
         } else if (userData.role === UserRole.Staff) {
           profileData.staff_profile = { create: { job_title: 'General Staff' } };
         }
@@ -139,7 +182,7 @@ async function main() {
           data: {
             username: userData.username,
             email: userData.email,
-            password_hash: userData.password_hash, // HASH IN PRODUCTION!
+            password_hash: userData.password_hash,
             role: userData.role,
             first_name: userData.first_name,
             last_name: userData.last_name,
@@ -154,7 +197,6 @@ async function main() {
       }
     }
   }
-
 
   console.log('Seeding finished.');
 }

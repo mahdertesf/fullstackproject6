@@ -15,7 +15,7 @@ import type {
   Building as PrismaBuilding,
   Room as PrismaRoom,
   Prerequisite as PrismaPrerequisite,
-  AuditLog as PrismaAuditLog,
+  // AuditLog as PrismaAuditLog, // AuditLog import removed
   StudentAssessmentScore as PrismaStudentAssessmentScore,
   AnnouncementTargetSection as PrismaAnnouncementTargetSection,
   UserRole as PrismaUserRole,
@@ -30,9 +30,9 @@ import type {
 export type User = PrismaUser;
 export type Department = PrismaDepartment;
 export type Course = PrismaCourse;
-export type Student = PrismaStudent; // Represents the student profile data
-export type Teacher = PrismaTeacher; // Represents the teacher profile data
-export type Staff = PrismaStaff;     // Represents the staff profile data
+export type Student = PrismaStudent;
+export type Teacher = PrismaTeacher;
+export type Staff = PrismaStaff;
 export type Semester = PrismaSemester;
 export type Announcement = PrismaAnnouncement;
 export type ScheduledCourse = PrismaScheduledCourse;
@@ -42,11 +42,10 @@ export type Assessment = PrismaAssessment;
 export type Building = PrismaBuilding;
 export type Room = PrismaRoom;
 export type Prerequisite = PrismaPrerequisite;
-export type AuditLog = PrismaAuditLog;
+// export type AuditLog = PrismaAuditLog; // AuditLog type re-export removed
 export type StudentAssessmentScore = PrismaStudentAssessmentScore;
 export type AnnouncementTargetSection = PrismaAnnouncementTargetSection;
 
-// Re-export Enums or use Prisma's directly in components
 export type UserRole = PrismaUserRole;
 export type SemesterTerm = PrismaSemesterTerm;
 export type RegistrationStatus = PrismaRegistrationStatus;
@@ -54,17 +53,13 @@ export type MaterialType = PrismaMaterialType;
 export type AnnouncementStatus = PrismaAnnouncementStatus;
 export type AnnouncementTargetAudience = PrismaAnnouncementTargetAudience;
 
-
-// UserProfile now includes profile relations and an optional isSuperAdmin flag
 export type UserProfile = PrismaUser & {
   student_profile?: PrismaStudent | null;
   teacher_profile?: PrismaTeacher | null;
   staff_profile?: PrismaStaff | null;
-  // isSuperAdmin flag is directly on User model in Prisma
   profile_picture_url?: string | null; 
 };
 
-// EnrichedRegistration for frontend use where relations are included
 export type EnrichedRegistration = PrismaRegistration & {
   student?: UserProfile; 
   scheduledCourse?: PrismaScheduledCourse & {
@@ -77,8 +72,8 @@ export type EnrichedRegistration = PrismaRegistration & {
 };
 
 export interface TeacherSectionInfo {
-  id: string; // scheduled_course_id as string
-  name: string; // e.g., "SE301 - S1 (Spring 2024)"
+  id: string; 
+  name: string; 
 }
 
 export const gradePointMapping: Record<string, number> = {
