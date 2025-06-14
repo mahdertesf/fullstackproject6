@@ -1,9 +1,8 @@
 // src/components/announcements/AnnouncementGeneratorForm.tsx
-
 'use client';
 
 import { zodResolver } from '@hookform/resolvers/zod';
-import { useForm, Controller } from 'react-hook-form';
+import { useForm } from 'react-hook-form';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from '@/components/ui/card';
 import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from '@/components/ui/form';
@@ -13,22 +12,25 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { Checkbox } from '@/components/ui/checkbox';
 import { ScrollArea } from '@/components/ui/scroll-area';
 import { AnnouncementGeneratorSchema, type AnnouncementGeneratorFormData } from '@/lib/schemas';
-import { generateAnnouncement } from '@/ai/flows/generate-announcement';
+import { generateAnnouncement as genkitGenerateAnnouncement } from '@/ai/flows/generate-announcement';
+import { createAnnouncement } from '@/actions/announcementActions'; // DB action
 import { useState, useEffect } from 'react';
 import { Wand2, Loader2, Send } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
-import type { AnnouncementTargetAudience, AnnouncementTone, UserRole, TeacherSectionInfo } from '@/types';
-import { mockAnnouncements } from '@/lib/data'; // For mock submission
+import type { UserRole, AnnouncementTargetAudience as PrismaAudience } from '@prisma/client';
+import type { TeacherSectionInfo } from '@/types';
 
-const desiredTones: AnnouncementTone[] = ['Formal', 'Urgent', 'Friendly', 'Informative', 'Academic'];
-const allTargetAudiences: AnnouncementTargetAudience[] = ['Students', 'Teachers', 'Staff', 'All Users'];
+
+const desiredTones: PrismaAudience[] = ['Formal', 'Urgent', 'Friendly', 'Informative', 'Academic']; // Assuming these match enum, adjust if not
+const allTargetAudiences: PrismaAudience[] = ['Students', 'Teachers', 'Staff', 'AllUsers'];
 
 interface AnnouncementGeneratorFormProps {
   userRole: UserRole;
-  availableSections?: TeacherSectionInfo[]; // For teachers
+  authorId: number;
+  availableSections?: TeacherSectionInfo[]; 
 }
 
-export default function AnnouncementGeneratorForm({ userRole, availableSections = [] }: AnnouncementGeneratorFormProps) {
+export default function AnnouncementGeneratorForm({ userRole, authorId, availableSections = [] }: AnnouncementGeneratorFormProps) {
   const { toast } = useToast();
   const [isLoadingAi, setIsLoadingAi] = useState(false);
   const [isSubmitting, setIsSubmitting] = useState(false);
@@ -40,27 +42,24 @@ export default function AnnouncementGeneratorForm({ userRole, availableSections 
     defaultValues: {
       topic: '',
       desiredTone: 'Friendly',
-      targetAudience: userRole === 'Teacher' ? 'Students' : 'All Users',
+      targetAudience: userRole === 'Teacher' ? 'Students' : 'AllUsers',
       selectedSections: [],
     },
   });
   
   useEffect(() => {
-    // If the role changes, reset the target audience if needed
     if (userRole === 'Teacher') {
       form.setValue('targetAudience', 'Students');
     } else {
-      // For Staff/Admin, default to 'All Users' or let them pick
       if (form.getValues('targetAudience') === 'Students' && userRole !== 'Teacher') {
-         form.setValue('targetAudience', 'All Users');
+         form.setValue('targetAudience', 'AllUsers');
       }
     }
   }, [userRole, form]);
 
 
-  const handleGenerateAnnouncement = async () => {
+  const handleGenerateWithAI = async () => {
     const formData = form.getValues();
-    // Manually set targetAudience for teachers if it's not in the form
     const effectiveTargetAudience = userRole === 'Teacher' ? 'Students' : formData.targetAudience;
 
     if (!effectiveTargetAudience && userRole !== 'Teacher') {
@@ -68,18 +67,16 @@ export default function AnnouncementGeneratorForm({ userRole, availableSections 
         return;
     }
     if (userRole === 'Teacher' && (!formData.selectedSections || formData.selectedSections.length === 0)) {
-        form.setError('selectedSections', { type: 'manual', message: 'Please select at least one section.' });
+        form.setError('selectedSections', { type: 'manual', message: 'Please select at least one section for teacher announcements.' });
         return;
     }
     
     const validationResult = AnnouncementGeneratorSchema.safeParse({
       ...formData,
-      targetAudience: effectiveTargetAudience, // Use the determined audience
+      targetAudience: effectiveTargetAudience as PrismaAudience,
     });
 
     if (!validationResult.success) {
-      console.error("Form validation errors:", validationResult.error.flatten().fieldErrors);
-      // Trigger validation for all fields to show messages
       form.trigger();
       return;
     }
@@ -88,7 +85,7 @@ export default function AnnouncementGeneratorForm({ userRole, availableSections 
     try {
       const aiInputData = {
         ...validationResult.data,
-        targetAudience: effectiveTargetAudience!,
+        targetAudience: effectiveTargetAudience! as PrismaAudience,
         sections: userRole === 'Teacher' && validationResult.data.selectedSections 
           ? validationResult.data.selectedSections
               .map(id => availableSections.find(s => s.id === id)?.name)
@@ -96,74 +93,52 @@ export default function AnnouncementGeneratorForm({ userRole, availableSections 
           : undefined,
       };
 
-      const result = await generateAnnouncement(aiInputData);
+      const result = await genkitGenerateAnnouncement(aiInputData);
       setGeneratedTitle(result.title);
       setGeneratedContent(result.content);
-      toast({
-        title: 'Announcement Generated',
-        description: 'AI has drafted a title and content for your announcement.',
-      });
+      form.setValue('topic', result.title); // Update topic with AI title
+      toast({ title: 'Announcement Generated', description: 'AI has drafted a title and content.' });
     } catch (error) {
-      console.error('AI generation failed:', error);
-      toast({
-        variant: 'destructive',
-        title: 'AI Generation Failed',
-        description: 'Could not generate announcement. Please try again.',
-      });
+      toast({ variant: 'destructive', title: 'AI Generation Failed', description: (error as Error).message || 'Could not generate content.' });
     } finally {
       setIsLoadingAi(false);
     }
   };
 
-  const handleSubmitGenerated = async () => {
+  const handleSubmitToDB = async () => {
     setIsSubmitting(true);
     const formData = form.getValues();
-    const finalTargetAudience = userRole === 'Teacher' ? 'Students' : formData.targetAudience;
-    
-    // Mock submission logic
-    const newAnnouncementId = Math.max(0, ...mockAnnouncements.map(a => a.announcement_id)) + 1;
-    mockAnnouncements.push({
-      announcement_id: newAnnouncementId,
-      title: generatedTitle,
-      content: generatedContent,
-      author_id: 1, // Mock author ID
-      target_audience: finalTargetAudience!,
-      desired_tone: formData.desiredTone,
-      status: 'Published',
-      publish_date: new Date().toISOString(),
-      created_at: new Date().toISOString(),
-      updated_at: new Date().toISOString(),
-      target_section_ids: userRole === 'Teacher' && formData.selectedSections ? formData.selectedSections.map(id => parseInt(id)) : undefined,
-    });
+    const finalData = {
+      ...formData,
+      topic: generatedTitle || formData.topic, // Use AI title if available
+      content: generatedContent, // Must have AI content to submit this way
+      targetAudience: (userRole === 'Teacher' ? 'Students' : formData.targetAudience) as PrismaAudience,
+    };
 
-    console.log('Submitting announcement:', { 
-      title: generatedTitle, 
-      content: generatedContent, 
-      tone: formData.desiredTone,
-      targetAudience: finalTargetAudience,
-      selectedSections: userRole === 'Teacher' ? formData.selectedSections : undefined,
-    });
-    await new Promise(resolve => setTimeout(resolve, 1000)); 
-    toast({
-      title: 'Announcement Submitted (Mock)',
-      description: 'Your announcement has been notionally submitted.',
-    });
-    setGeneratedTitle('');
-    setGeneratedContent('');
-    form.reset({
-        topic: '',
-        desiredTone: 'Friendly',
-        targetAudience: userRole === 'Teacher' ? 'Students' : 'All Users',
-        selectedSections: [],
-    });
-    setIsSubmitting(false);
+    if(!finalData.content) {
+      toast({variant: 'destructive', title: 'Missing Content', description: 'Please generate content with AI before submitting.'});
+      setIsSubmitting(false);
+      return;
+    }
+    
+    try {
+      await createAnnouncement(finalData, authorId, availableSections);
+      toast({ title: 'Announcement Submitted', description: 'Your announcement has been saved.' });
+      setGeneratedTitle('');
+      setGeneratedContent('');
+      form.reset({ topic: '', desiredTone: 'Friendly', targetAudience: userRole === 'Teacher' ? 'Students' : 'AllUsers', selectedSections: [] });
+    } catch (error) {
+      toast({ variant: 'destructive', title: 'Submission Failed', description: (error as Error).message || 'Could not submit announcement.'});
+    } finally {
+      setIsSubmitting(false);
+    }
   };
 
   return (
     <Card className="w-full max-w-2xl mx-auto">
       <CardHeader>
         <CardTitle className="text-2xl font-headline">AI Announcement Generator</CardTitle>
-        <CardDescription>Let AI help you craft the perfect announcement. Enter a topic, desired tone, and target audience.</CardDescription>
+        <CardDescription>Let AI help you craft the perfect announcement.</CardDescription>
       </CardHeader>
       <Form {...form}>
         <CardContent className="space-y-6">
@@ -172,9 +147,9 @@ export default function AnnouncementGeneratorForm({ userRole, availableSections 
             name="topic"
             render={({ field }) => (
               <FormItem>
-                <FormLabel>Announcement Topic</FormLabel>
+                <FormLabel>Announcement Topic/Title</FormLabel>
                 <FormControl>
-                  <Input placeholder="e.g., Midterm registration deadline reminder" {...field} />
+                  <Input placeholder="e.g., Midterm registration deadline" {...field} value={generatedTitle || field.value} onChange={(e) => { field.onChange(e); if(generatedTitle) setGeneratedTitle(e.target.value);}}/>
                 </FormControl>
                 <FormMessage />
               </FormItem>
@@ -188,15 +163,9 @@ export default function AnnouncementGeneratorForm({ userRole, availableSections 
                 <FormItem>
                   <FormLabel>Desired Tone</FormLabel>
                   <Select onValueChange={field.onChange} defaultValue={field.value}>
-                    <FormControl>
-                      <SelectTrigger>
-                        <SelectValue placeholder="Select a tone" />
-                      </SelectTrigger>
-                    </FormControl>
+                    <FormControl><SelectTrigger><SelectValue placeholder="Select a tone" /></SelectTrigger></FormControl>
                     <SelectContent>
-                      {desiredTones.map(tone => (
-                        <SelectItem key={tone} value={tone}>{tone}</SelectItem>
-                      ))}
+                      {desiredTones.map(tone => (<SelectItem key={tone} value={tone}>{tone}</SelectItem>))}
                     </SelectContent>
                   </Select>
                   <FormMessage />
@@ -211,15 +180,9 @@ export default function AnnouncementGeneratorForm({ userRole, availableSections 
                   <FormItem>
                     <FormLabel>Target Audience</FormLabel>
                     <Select onValueChange={field.onChange} value={field.value || ''}>
-                      <FormControl>
-                        <SelectTrigger>
-                          <SelectValue placeholder="Select target audience" />
-                        </SelectTrigger>
-                      </FormControl>
+                      <FormControl><SelectTrigger><SelectValue placeholder="Select audience" /></SelectTrigger></FormControl>
                       <SelectContent>
-                        {allTargetAudiences.map(audience => (
-                          <SelectItem key={audience} value={audience}>{audience}</SelectItem>
-                        ))}
+                        {allTargetAudiences.map(audience => (<SelectItem key={audience} value={audience}>{audience}</SelectItem>))}
                       </SelectContent>
                     </Select>
                     <FormMessage />
@@ -235,44 +198,23 @@ export default function AnnouncementGeneratorForm({ userRole, availableSections 
               name="selectedSections"
               render={() => (
                 <FormItem>
-                  <div className="mb-4">
-                    <FormLabel className="text-base">Select Sections for Announcement</FormLabel>
-                    <p className="text-sm text-muted-foreground">
-                      Choose which of your sections will receive this announcement.
-                    </p>
+                  <div className="mb-4"><FormLabel className="text-base">Select Sections</FormLabel>
+                    <p className="text-sm text-muted-foreground">Choose sections for this announcement.</p>
                   </div>
                   <ScrollArea className="h-40 rounded-md border p-2">
                     {availableSections.map((section) => (
-                      <FormField
-                        key={section.id}
-                        control={form.control}
-                        name="selectedSections"
-                        render={({ field }) => {
-                          return (
-                            <FormItem
-                              key={section.id}
-                              className="flex flex-row items-start space-x-3 space-y-0 py-2 hover:bg-muted/50 rounded-sm px-2"
-                            >
-                              <FormControl>
-                                <Checkbox
-                                  checked={field.value?.includes(section.id)}
-                                  onCheckedChange={(checked) => {
-                                    return checked
-                                      ? field.onChange([...(field.value || []), section.id])
-                                      : field.onChange(
-                                          (field.value || []).filter(
-                                            (value) => value !== section.id
-                                          )
-                                        )
-                                  }}
-                                />
-                              </FormControl>
-                              <FormLabel className="font-normal text-sm">
-                                {section.name}
-                              </FormLabel>
-                            </FormItem>
-                          )
-                        }}
+                      <FormField key={section.id} control={form.control} name="selectedSections"
+                        render={({ field }) => (
+                          <FormItem key={section.id} className="flex flex-row items-start space-x-3 space-y-0 py-2 hover:bg-muted/50 rounded-sm px-2">
+                            <FormControl>
+                              <Checkbox
+                                checked={field.value?.includes(section.id)}
+                                onCheckedChange={(checked) => field.onChange(checked ? [...(field.value || []), section.id] : (field.value || []).filter(v => v !== section.id))}
+                              />
+                            </FormControl>
+                            <FormLabel className="font-normal text-sm">{section.name}</FormLabel>
+                          </FormItem>
+                        )}
                       />
                     ))}
                   </ScrollArea>
@@ -281,34 +223,27 @@ export default function AnnouncementGeneratorForm({ userRole, availableSections 
               )}
             />
           )}
-          {userRole === 'Teacher' && (!availableSections || availableSections.length === 0) && (
-            <p className="text-sm text-muted-foreground">You do not have any sections assigned to make announcements to.</p>
-          )}
+           {userRole === 'Teacher' && (!availableSections || availableSections.length === 0) && (
+             <p className="text-sm text-muted-foreground py-2 px-1 border rounded-md bg-muted/50">You currently have no sections assigned. Please contact administration if this is an error.</p>
+           )}
 
-
-          <Button type="button" onClick={handleGenerateAnnouncement} disabled={isLoadingAi || (userRole === 'Teacher' && availableSections.length === 0)} className="w-full bg-accent hover:bg-accent/90">
+          <Button type="button" onClick={handleGenerateWithAI} disabled={isLoadingAi || (userRole === 'Teacher' && availableSections.length === 0)} className="w-full bg-accent hover:bg-accent/90">
             {isLoadingAi ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <Wand2 className="mr-2 h-4 w-4" />}
             Generate with AI
           </Button>
 
-          {generatedTitle && (
-            <FormItem>
-              <FormLabel>Generated Title</FormLabel>
-              <Input value={generatedTitle} readOnly className="bg-muted/50" />
-            </FormItem>
-          )}
           {generatedContent && (
             <FormItem>
               <FormLabel>Generated Content</FormLabel>
-              <Textarea value={generatedContent} readOnly rows={8} className="bg-muted/50" />
+              <Textarea value={generatedContent} onChange={(e) => setGeneratedContent(e.target.value)} rows={8} className="bg-muted/50" />
             </FormItem>
           )}
         </CardContent>
-        {generatedTitle && generatedContent && (
+        {generatedContent && (
           <CardFooter>
-            <Button type="button" onClick={handleSubmitGenerated} disabled={isSubmitting || (userRole === 'Teacher' && availableSections.length === 0)} className="w-full">
+            <Button type="button" onClick={handleSubmitToDB} disabled={isSubmitting || (userRole === 'Teacher' && availableSections.length === 0)} className="w-full">
               {isSubmitting ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <Send className="mr-2 h-4 w-4" />}
-              Submit Announcement (Mock)
+              Submit Announcement
             </Button>
           </CardFooter>
         )}

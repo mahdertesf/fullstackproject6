@@ -1,8 +1,7 @@
 // src/app/(main)/staff/user-management/page.tsx
-
 'use client';
 
-import { useState, useMemo, useEffect } from 'react';
+import { useState, useMemo, useEffect, startTransition } from 'react';
 import PageHeader from '@/components/shared/PageHeader';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -11,8 +10,7 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from '@/components/ui/dropdown-menu';
 import { Card } from '@/components/ui/card';
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog';
-import { mockUserProfiles } from '@/lib/data';
-import type { UserProfile, UserRole } from '@/types';
+import type { UserProfile as FullUserProfile, UserRole } from '@prisma/client';
 import { Users, Edit, Trash2, PlusCircle, Search, Filter, MoreHorizontal, ShieldAlert, Loader2 } from 'lucide-react';
 import { useAuthStore } from '@/store/authStore';
 import { useRouter } from 'next/navigation';
@@ -21,11 +19,12 @@ import AddUserForm from '@/components/users/AddUserForm';
 import EditUserForm from '@/components/users/EditUserForm';
 import { NewUserFormData, EditUserFormData } from '@/lib/schemas';
 import { useToast } from '@/hooks/use-toast';
+import { getAllUsers, createUser, updateUser, deleteUser } from '@/actions/userActions';
 
 const ITEMS_PER_PAGE = 10;
 
 export default function UserManagementPage() {
-  const { user } = useAuthStore();
+  const { user: currentUser } = useAuthStore();
   const router = useRouter();
   const { toast } = useToast();
 
@@ -34,56 +33,51 @@ export default function UserManagementPage() {
   const [currentPage, setCurrentPage] = useState(1);
   const [isAddUserDialogOpen, setIsAddUserDialogOpen] = useState(false);
   const [isEditUserDialogOpen, setIsEditUserDialogOpen] = useState(false);
-  const [editingUser, setEditingUser] = useState<UserProfile | null>(null);
+  const [editingUser, setEditingUser] = useState<FullUserProfile | null>(null);
   const [isSubmitting, setIsSubmitting] = useState(false);
-  const [usersList, setUsersList] = useState<UserProfile[]>(mockUserProfiles);
+  const [isLoadingData, setIsLoadingData] = useState(true);
+  const [usersList, setUsersList] = useState<FullUserProfile[]>([]);
+
+  const fetchUsers = async () => {
+    setIsLoadingData(true);
+    try {
+      // For Staff (non-superadmin), filter criteria in getAllUsers action will apply
+      const data = await getAllUsers({ searchTerm, role: selectedRole }, currentUser?.user_id, currentUser?.is_super_admin);
+      setUsersList(data);
+    } catch (error) {
+      toast({ variant: 'destructive', title: 'Error', description: 'Failed to load users.' });
+    } finally {
+      setIsLoadingData(false);
+    }
+  };
+  
+  useEffect(() => {
+    if (currentUser && currentUser.role !== 'Staff' && !currentUser.is_super_admin) {
+      router.replace('/dashboard');
+    } else if (currentUser) {
+        fetchUsers();
+    }
+  }, [currentUser, router]);
 
   useEffect(() => {
-    if (user && user.role !== 'Staff' && !user.isSuperAdmin) {
-      router.replace('/dashboard');
+    if (currentUser) {
+        const handler = setTimeout(() => {
+             startTransition(() => { fetchUsers(); });
+        }, 300);
+        return () => clearTimeout(handler);
     }
-  }, [user, router]);
+  }, [searchTerm, selectedRole, currentUser]);
 
-  const filteredUsers = useMemo(() => {
-    return usersList.filter(u => {
-      const searchLower = searchTerm.toLowerCase();
-      const matchesSearch =
-        u.username.toLowerCase().includes(searchLower) ||
-        u.email.toLowerCase().includes(searchLower) ||
-        (u.first_name && u.first_name.toLowerCase().includes(searchLower)) ||
-        (u.last_name && u.last_name.toLowerCase().includes(searchLower));
 
-      const matchesRole = selectedRole === 'all' ? true : u.role === selectedRole;
-      
-      if (user?.isSuperAdmin) return matchesSearch && matchesRole;
-      // Staff can see Students and Teachers, but not other Staff (unless they are also super admin, handled above)
-      if (user?.role === 'Staff') {
-        return matchesSearch && matchesRole && (u.role === 'Student' || u.role === 'Teacher');
-      }
-      return false; 
-    });
-  }, [searchTerm, selectedRole, user, usersList]);
-
-  const paginatedUsers = filteredUsers.slice(
+  const paginatedUsers = usersList.slice(
     (currentPage - 1) * ITEMS_PER_PAGE,
     currentPage * ITEMS_PER_PAGE
   );
+  const totalPages = Math.ceil(usersList.length / ITEMS_PER_PAGE);
 
-  const handleOpenEditDialog = (userToEdit: UserProfile) => {
-    if (user?.role === 'Staff' && !user?.isSuperAdmin && userToEdit.role === 'Staff') {
-        toast({
-            variant: 'destructive',
-            title: 'Permission Denied',
-            description: 'Staff users cannot edit other Staff user accounts.',
-        });
-        return;
-    }
-    if (user?.role === 'Staff' && !user?.isSuperAdmin && userToEdit.isSuperAdmin) {
-        toast({
-            variant: 'destructive',
-            title: 'Permission Denied',
-            description: 'Staff users cannot edit Super Admin accounts.',
-        });
+  const handleOpenEditDialog = (userToEdit: FullUserProfile) => {
+    if (currentUser?.role === 'Staff' && !currentUser?.is_super_admin && (userToEdit.role === 'Staff' || userToEdit.is_super_admin)) {
+        toast({ variant: 'destructive', title: 'Permission Denied', description: 'Staff cannot edit Staff or Admin accounts.' });
         return;
     }
     setEditingUser(userToEdit);
@@ -91,291 +85,122 @@ export default function UserManagementPage() {
   };
   
   const handleEditUserSubmit = async (data: EditUserFormData) => {
-    if (!editingUser) return;
+    if (!editingUser || !currentUser) return;
     setIsSubmitting(true);
-    console.log("Editing user data:", editingUser.user_id, data);
-    
-    await new Promise(resolve => setTimeout(resolve, 1000)); // Simulate API call
-
-    setUsersList(prev => 
-      prev.map(u => 
-        u.user_id === editingUser.user_id 
-          ? { 
-              ...u, 
-              username: data.username,
-              email: data.email,
-              first_name: data.firstName,
-              last_name: data.lastName,
-              role: data.role,
-              is_active: data.is_active,
-              updated_at: new Date().toISOString(),
-            } 
-          : u
-      )
-    );
-    
-    toast({
-      title: 'User Updated (Mock)',
-      description: `User ${data.username} has been updated.`,
-    });
-    setIsSubmitting(false);
-    setIsEditUserDialogOpen(false);
-    setEditingUser(null);
+    try {
+      await updateUser(editingUser.user_id, data, currentUser.user_id);
+      toast({ title: 'User Updated', description: `User ${data.username} has been updated.` });
+      setIsEditUserDialogOpen(false); setEditingUser(null);
+      startTransition(fetchUsers);
+    } catch (error) { toast({ variant: 'destructive', title: 'Error', description: (error as Error).message || 'Failed to update user.'});
+    } finally { setIsSubmitting(false); }
   };
 
-
-  const handleDeleteUser = (userId: number) => {
+  const handleDeleteUser = async (userId: number) => {
     const userToDelete = usersList.find(u => u.user_id === userId);
-    if (!userToDelete) return;
-
-    if (user?.role === 'Staff' && !user.isSuperAdmin && userToDelete?.role === 'Staff') {
-         toast({ variant: 'destructive', title: 'Permission Denied', description: 'Staff cannot delete other Staff accounts.' });
-         return;
-    }
-    if (user?.role === 'Staff' && !user.isSuperAdmin && userToDelete?.isSuperAdmin) {
-        toast({ variant: 'destructive', title: 'Permission Denied', description: 'Staff cannot delete Super Admin accounts.'});
-        return;
-    }
-    if (userToDelete?.isSuperAdmin && user?.user_id === userToDelete.user_id) {
-        toast({ variant: 'destructive', title: 'Action Denied', description: 'Super Admins cannot delete their own account.'});
-        return;
-    }
-
-    console.log(`Attempting to delete user: ${userId}`);
-    // Mock deletion by filtering out the user from the list
-    setUsersList(prev => prev.filter(u => u.user_id !== userId));
-    toast({ title: 'User Deleted (Mock)', description: `User ${userToDelete.username} has been removed from the list.` });
+    if (!userToDelete || !currentUser) return;
+    if (!confirm(`Are you sure you want to delete user "${userToDelete.username}"?`)) return;
+    setIsSubmitting(true);
+    try {
+      await deleteUser(userId, currentUser.user_id);
+      toast({ title: 'User Deleted', description: `User ${userToDelete.username} has been removed.` });
+      startTransition(fetchUsers);
+    } catch (error) { toast({ variant: 'destructive', title: 'Error', description: (error as Error).message || 'Failed to delete user.'});
+    } finally { setIsSubmitting(false); }
   };
 
   const handleAddNewUser = async (data: NewUserFormData) => {
+    if (!currentUser) return;
     setIsSubmitting(true);
-    console.log("New user data:", data);
-    await new Promise(resolve => setTimeout(resolve, 1000)); 
-    
-    const newUserId = Math.max(...usersList.map(u => u.user_id), 0) + 1;
-    const newUserProfile: UserProfile = {
-      user_id: newUserId,
-      username: data.username,
-      email: data.email,
-      role: data.role,
-      first_name: data.firstName,
-      last_name: data.lastName,
-      is_active: true, 
-      password_hash: 'mock_hash', // In a real app, this would be securely hashed
-      created_at: new Date().toISOString(),
-      updated_at: new Date().toISOString(),
-      isSuperAdmin: data.role === 'Staff' ? false : undefined, // Staff cannot create super admins
-    };
-    setUsersList(prev => [newUserProfile, ...prev]); // Add to the beginning for visibility
-    
-    toast({
-      title: 'User Created (Mock)',
-      description: `User ${data.username} has been created.`,
-    });
-    setIsSubmitting(false);
-    setIsAddUserDialogOpen(false);
+    try {
+      await createUser(data, currentUser.role, currentUser.is_super_admin);
+      toast({ title: 'User Created', description: `User ${data.username} has been created.` });
+      setIsAddUserDialogOpen(false);
+      startTransition(fetchUsers);
+    } catch (error) { toast({ variant: 'destructive', title: 'Error', description: (error as Error).message || 'Failed to create user.'});
+    } finally { setIsSubmitting(false); }
   };
   
-  if (!user || (user.role !== 'Staff' && !user.isSuperAdmin)) {
-    return (
-      <div className="flex flex-col items-center justify-center min-h-[calc(100vh-10rem)] text-center">
-        <ShieldAlert className="w-16 h-16 text-destructive mb-4" />
-        <h2 className="text-2xl font-bold mb-2">Access Denied</h2>
-        <p className="text-muted-foreground">You do not have permission to access this page.</p>
-      </div>
-    );
+  if (!currentUser || (currentUser.role !== 'Staff' && !currentUser.is_super_admin)) {
+    return <div className="flex flex-col items-center justify-center min-h-[calc(100vh-10rem)] text-center"><ShieldAlert className="w-16 h-16 text-destructive mb-4" /><h2 className="text-2xl font-bold mb-2">Access Denied</h2></div>;
   }
   
-  // Staff can add Students and Teachers. SuperAdmins can add Staff too.
-  const availableRolesForNewUser: UserRole[] = user.isSuperAdmin ? ['Student', 'Teacher', 'Staff'] : ['Student', 'Teacher'];
-  // Staff can edit Students and Teachers. SuperAdmins can edit Staff too (except demoting other super admins easily).
-  const availableRolesForEdit: UserRole[] = user.isSuperAdmin ? ['Student', 'Teacher', 'Staff'] : ['Student', 'Teacher'];
-
+  const availableRolesForNewUser: UserRole[] = currentUser.is_super_admin ? ['Student', 'Teacher', 'Staff'] : ['Student', 'Teacher'];
+  const availableRolesForEdit: UserRole[] = currentUser.is_super_admin ? ['Student', 'Teacher', 'Staff'] : ['Student', 'Teacher'];
 
   return (
     <div className="space-y-6">
       <PageHeader
         title="User Management"
-        description="Manage student and teacher accounts."
+        description={currentUser.is_super_admin ? "Manage all user accounts." : "Manage student and teacher accounts."}
         icon={Users}
         action={
           <Dialog open={isAddUserDialogOpen} onOpenChange={setIsAddUserDialogOpen}>
-            <DialogTrigger asChild>
-              <Button>
-                <PlusCircle className="mr-2 h-4 w-4" /> Add New User
-              </Button>
-            </DialogTrigger>
+            <DialogTrigger asChild><Button><PlusCircle className="mr-2 h-4 w-4" /> Add New User</Button></DialogTrigger>
             <DialogContent className="sm:max-w-[600px]">
-              <DialogHeader>
-                <DialogTitle>Add New User</DialogTitle>
-                <DialogDescription>
-                  Fill in the details to create a new user account. {user.isSuperAdmin ? "Admins can create Staff roles." : "Staff can create Student or Teacher roles."}
-                </DialogDescription>
+              <DialogHeader><DialogTitle>Add New User</DialogTitle>
+                <DialogDescription>{currentUser.is_super_admin ? "Admins can create Staff roles." : "Staff can create Student or Teacher roles."}</DialogDescription>
               </DialogHeader>
-              <AddUserForm
-                onSubmit={handleAddNewUser}
-                onCancel={() => setIsAddUserDialogOpen(false)}
-                availableRoles={availableRolesForNewUser}
-                isSubmitting={isSubmitting}
-              />
+              <AddUserForm onSubmit={handleAddNewUser} onCancel={() => setIsAddUserDialogOpen(false)} availableRoles={availableRolesForNewUser} isSubmitting={isSubmitting} />
             </DialogContent>
           </Dialog>
         }
       />
-
       <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-6 p-4 border rounded-lg shadow-sm bg-card">
         <div className="md:col-span-2">
-          <label htmlFor="search-users" className="block text-sm font-medium text-foreground mb-1">Search Users</label>
-          <div className="relative">
-            <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-5 w-5 text-muted-foreground" />
-            <Input
-              id="search-users"
-              type="text"
-              placeholder="Search by name, username, or email..."
-              value={searchTerm}
-              onChange={(e) => setSearchTerm(e.target.value)}
-              className="pl-10"
-            />
-          </div>
+          <label htmlFor="search-users" className="block text-sm font-medium text-foreground mb-1">Search</label>
+          <div className="relative"><Search className="absolute left-3 top-1/2 -translate-y-1/2 h-5 w-5 text-muted-foreground" /><Input id="search-users" type="text" placeholder="Search..." value={searchTerm} onChange={(e) => setSearchTerm(e.target.value)} className="pl-10"/></div>
         </div>
         <div>
           <label htmlFor="filter-role" className="block text-sm font-medium text-foreground mb-1">Filter by Role</label>
           <Select value={selectedRole} onValueChange={(value) => setSelectedRole(value as UserRole | 'all')}>
-            <SelectTrigger id="filter-role" className="w-full">
-              <Filter className="h-4 w-4 mr-2 text-muted-foreground" />
-              <SelectValue placeholder="All Roles" />
-            </SelectTrigger>
+            <SelectTrigger id="filter-role" className="w-full"><Filter className="h-4 w-4 mr-2 text-muted-foreground" /><SelectValue placeholder="All Roles" /></SelectTrigger>
             <SelectContent>
-              <SelectItem value="all">All Roles</SelectItem>
-              <SelectItem value="Student">Student</SelectItem>
-              <SelectItem value="Teacher">Teacher</SelectItem>
-              {user?.isSuperAdmin && <SelectItem value="Staff">Staff</SelectItem>}
+              <SelectItem value="all">All Roles</SelectItem><SelectItem value="Student">Student</SelectItem><SelectItem value="Teacher">Teacher</SelectItem>
+              {currentUser?.is_super_admin && <SelectItem value="Staff">Staff</SelectItem>}
             </SelectContent>
           </Select>
         </div>
       </div>
 
+      {isLoadingData ? <div className="flex justify-center items-center p-8"><Loader2 className="h-8 w-8 animate-spin" /></div> : (
       <Card>
         <Table>
-          <TableHeader>
-            <TableRow>
-              <TableHead>Name</TableHead>
-              <TableHead>Username</TableHead>
-              <TableHead>Email</TableHead>
-              <TableHead>Role</TableHead>
-              <TableHead>Status</TableHead>
-              <TableHead className="text-right">Actions</TableHead>
-            </TableRow>
-          </TableHeader>
+          <TableHeader><TableRow><TableHead>Name</TableHead><TableHead>Username</TableHead><TableHead>Email</TableHead><TableHead>Role</TableHead><TableHead>Status</TableHead><TableHead className="text-right">Actions</TableHead></TableRow></TableHeader>
           <TableBody>
             {paginatedUsers.length > 0 ? (
               paginatedUsers.map((u) => (
                 <TableRow key={u.user_id}>
-                  <TableCell>
-                    <div className="font-medium">{u.first_name || ''} {u.last_name || ''}</div>
-                    {(!u.first_name && !u.last_name) && <span className="text-muted-foreground italic">N/A</span>}
-                  </TableCell>
-                  <TableCell>{u.username}</TableCell>
-                  <TableCell>{u.email}</TableCell>
-                  <TableCell>
-                    <Badge variant={u.role === 'Student' ? 'secondary' : u.role === 'Teacher' ? 'outline' : 'default'}>
-                      {u.isSuperAdmin ? 'Admin' : u.role}
-                    </Badge>
-                  </TableCell>
-                  <TableCell>
-                    <Badge variant={u.is_active ? 'default' : 'destructive'} className={u.is_active ? 'bg-green-500 hover:bg-green-600' : ''}>
-                      {u.is_active ? 'Active' : 'Inactive'}
-                    </Badge>
-                  </TableCell>
+                  <TableCell><div className="font-medium">{u.first_name || ''} {u.last_name || ''}</div>{(!u.first_name && !u.last_name) && <span className="text-muted-foreground italic">N/A</span>}</TableCell>
+                  <TableCell>{u.username}</TableCell><TableCell>{u.email}</TableCell>
+                  <TableCell><Badge variant={u.role === 'Student' ? 'secondary' : u.role === 'Teacher' ? 'outline' : 'default'}>{u.is_super_admin ? 'Admin' : u.role}</Badge></TableCell>
+                  <TableCell><Badge variant={u.is_active ? 'default' : 'destructive'} className={u.is_active ? 'bg-green-500 hover:bg-green-600' : ''}>{u.is_active ? 'Active' : 'Inactive'}</Badge></TableCell>
                   <TableCell className="text-right">
                     <DropdownMenu>
                       <DropdownMenuTrigger asChild>
-                        {/* Disable actions if the target user is a SuperAdmin AND the current user is NOT a SuperAdmin OR it's a different SuperAdmin */}
-                        <Button 
-                          variant="ghost" 
-                          size="icon" 
-                          disabled={u.isSuperAdmin && (!user?.isSuperAdmin || (user?.isSuperAdmin && user?.user_id !== u.user_id))}
-                        >
-                          <MoreHorizontal className="h-4 w-4" />
-                          <span className="sr-only">Actions</span>
-                        </Button>
+                        <Button variant="ghost" size="icon" disabled={(u.is_super_admin && (!currentUser?.is_super_admin || (currentUser?.is_super_admin && currentUser?.user_id !== u.user_id && u.user_id !== currentUser?.user_id))) || isSubmitting}><MoreHorizontal className="h-4 w-4" /></Button>
                       </DropdownMenuTrigger>
                       <DropdownMenuContent align="end">
-                        <DropdownMenuItem 
-                            onClick={() => handleOpenEditDialog(u)}
-                            // Staff cannot edit other Staff or SuperAdmins.
-                            // SuperAdmins can edit anyone, but cannot demote other SuperAdmins (handled in EditUserForm logic)
-                            disabled={(user?.role === 'Staff' && !user?.isSuperAdmin && (u.role === 'Staff' || u.isSuperAdmin))}
-                        >
-                          <Edit className="mr-2 h-4 w-4" /> Edit
-                        </DropdownMenuItem>
-                        <DropdownMenuItem 
-                            onClick={() => handleDeleteUser(u.user_id)} 
-                            className="text-destructive focus:text-destructive focus:bg-destructive/10"
-                            // Staff cannot delete other Staff or SuperAdmins.
-                            // SuperAdmins cannot delete themselves.
-                            disabled={ (user?.role === 'Staff' && !user?.isSuperAdmin && (u.role === 'Staff' || u.isSuperAdmin)) || (u.isSuperAdmin && u.user_id === user?.user_id) }
-                        >
-                          <Trash2 className="mr-2 h-4 w-4" /> Delete
-                        </DropdownMenuItem>
+                        <DropdownMenuItem onClick={() => handleOpenEditDialog(u)} disabled={(currentUser?.role === 'Staff' && !currentUser?.is_super_admin && (u.role === 'Staff' || u.is_super_admin))}><Edit className="mr-2 h-4 w-4" /> Edit</DropdownMenuItem>
+                        <DropdownMenuItem onClick={() => handleDeleteUser(u.user_id)} className="text-destructive focus:text-destructive focus:bg-destructive/10" disabled={(currentUser?.role === 'Staff' && !currentUser?.is_super_admin && (u.role === 'Staff' || u.is_super_admin)) || (u.user_id === currentUser?.user_id)}><Trash2 className="mr-2 h-4 w-4" /> Delete</DropdownMenuItem>
                       </DropdownMenuContent>
                     </DropdownMenu>
                   </TableCell>
                 </TableRow>
               ))
-            ) : (
-              <TableRow>
-                <TableCell colSpan={6} className="text-center h-24">
-                  No users found matching your criteria.
-                </TableCell>
-              </TableRow>
-            )}
+            ) : (<TableRow><TableCell colSpan={6} className="text-center h-24">No users found.</TableCell></TableRow>)}
           </TableBody>
         </Table>
       </Card>
-      {filteredUsers.length > ITEMS_PER_PAGE && (
-        <div className="flex justify-center mt-4">
-          <Button
-            variant="outline"
-            onClick={() => setCurrentPage(p => Math.max(1, p - 1))}
-            disabled={currentPage === 1}
-          >
-            Previous
-          </Button>
-          <span className="mx-4 self-center">
-            Page {currentPage} of {Math.ceil(filteredUsers.length / ITEMS_PER_PAGE)}
-          </span>
-          <Button
-            variant="outline"
-            onClick={() => setCurrentPage(p => Math.min(Math.ceil(filteredUsers.length / ITEMS_PER_PAGE), p + 1))}
-            disabled={currentPage === Math.ceil(filteredUsers.length / ITEMS_PER_PAGE)}
-          >
-            Next
-          </Button>
-        </div>
       )}
-
+      {totalPages > 1 && (
+        <div className="flex justify-center mt-4"><Button variant="outline" onClick={() => setCurrentPage(p => Math.max(1, p - 1))} disabled={currentPage === 1}>Previous</Button><span className="mx-4 self-center">Page {currentPage} of {totalPages}</span><Button variant="outline" onClick={() => setCurrentPage(p => Math.min(totalPages, p + 1))} disabled={currentPage === totalPages}>Next</Button></div>
+      )}
       {editingUser && (
-        <Dialog open={isEditUserDialogOpen} onOpenChange={(isOpen) => {
-          setIsEditUserDialogOpen(isOpen);
-          if (!isOpen) setEditingUser(null);
-        }}>
+        <Dialog open={isEditUserDialogOpen} onOpenChange={(isOpen) => { setIsEditUserDialogOpen(isOpen); if (!isOpen) setEditingUser(null); }}>
           <DialogContent className="sm:max-w-[600px]">
-            <DialogHeader>
-              <DialogTitle>Edit User: {editingUser.username}</DialogTitle>
-              <DialogDescription>
-                Modify the user details below.
-              </DialogDescription>
-            </DialogHeader>
-            <EditUserForm
-              userToEdit={editingUser}
-              onSubmit={handleEditUserSubmit}
-              onCancel={() => { setIsEditUserDialogOpen(false); setEditingUser(null); }}
-              availableRoles={availableRolesForEdit}
-              isSubmitting={isSubmitting}
-              currentUserRole={user?.role}
-              isCurrentUserSuperAdmin={user?.isSuperAdmin}
-            />
+            <DialogHeader><DialogTitle>Edit User: {editingUser.username}</DialogTitle></DialogHeader>
+            <EditUserForm userToEdit={editingUser} onSubmit={handleEditUserSubmit} onCancel={() => { setIsEditUserDialogOpen(false); setEditingUser(null); }} availableRoles={availableRolesForEdit} isSubmitting={isSubmitting} currentUserRole={currentUser?.role} isCurrentUserSuperAdmin={currentUser?.is_super_admin}/>
           </DialogContent>
         </Dialog>
       )}

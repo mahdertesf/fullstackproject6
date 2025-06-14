@@ -11,24 +11,29 @@ import { Input } from '@/components/ui/input';
 import { Textarea } from '@/components/ui/textarea';
 import { useAuthStore } from '@/store/authStore';
 import { UserProfileSchema, type UserProfileFormData } from '@/lib/schemas';
-import { UserCircle, Save } from 'lucide-react';
+import { UserCircle, Save, Loader2 } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
 import { useEffect, useState } from 'react';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
+import { updateUserProfile } from '@/actions/authActions';
+import type { UserProfile as FullUserProfile, Student, Teacher, Staff } from '@prisma/client';
+
 
 export default function ProfilePage() {
-  const { user, setUser } = useAuthStore(); // Assume setUser updates the store (mock)
+  const { user, setUser: setAuthUser } = useAuthStore();
   const { toast } = useToast();
   const [isLoading, setIsLoading] = useState(false);
 
   const form = useForm<UserProfileFormData>({
     resolver: zodResolver(UserProfileSchema),
+    // Initialize with empty strings or from user if available
     defaultValues: {
       email: user?.email || '',
       phone_number: user?.phone_number || '',
       address: user?.address || '',
-      office_location: user?.office_location || '',
-      job_title: user?.job_title || '',
+      // Role-specific fields:
+      office_location: user?.teacher_profile?.office_location || '',
+      job_title: user?.staff_profile?.job_title || '',
     },
   });
   
@@ -38,41 +43,66 @@ export default function ProfilePage() {
         email: user.email || '',
         phone_number: user.phone_number || '',
         address: user.address || '',
-        office_location: user.office_location || '',
-        job_title: user.job_title || '',
+        office_location: user.teacher_profile?.office_location || '',
+        job_title: user.staff_profile?.job_title || '',
       });
     }
   }, [user, form]);
 
 
   if (!user) {
-    return <div>Loading profile...</div>;
+    return <div className="flex justify-center items-center min-h-[calc(100vh-10rem)]"><Loader2 className="h-8 w-8 animate-spin"/> Loading profile...</div>;
   }
 
   const onSubmit = async (data: UserProfileFormData) => {
+    if (!user) return;
     setIsLoading(true);
-    // Mock update
-    console.log("Updating profile with:", data);
-    const updatedUser = { ...user, ...data };
-    setUser(updatedUser); // Update user in Zustand store
 
-    // In a real app, you would make an API call here.
-    await new Promise(resolve => setTimeout(resolve, 1000)); // Simulate API delay
+    const updateData: Partial<FullUserProfile> & {
+        student_profile?: Partial<Omit<Student, 'student_id' | 'user'>>;
+        teacher_profile?: Partial<Omit<Teacher, 'teacher_id' | 'user'>>;
+        staff_profile?: Partial<Omit<Staff, 'staff_id' | 'user'>>;
+    } = {
+        email: data.email,
+        phone_number: data.phone_number,
+        address: data.address,
+    };
 
-    toast({
-      title: 'Profile Updated',
-      description: 'Your profile information has been successfully updated.',
-    });
-    setIsLoading(false);
+    if (user.role === 'Teacher') {
+        updateData.teacher_profile = { office_location: data.office_location };
+    }
+    if (user.role === 'Staff') {
+        updateData.staff_profile = { job_title: data.job_title };
+    }
+    // Student profile might have other fields from student_profile table not on UserProfileSchema directly
+
+    try {
+      const updatedUser = await updateUserProfile(user.user_id, updateData);
+      setAuthUser(updatedUser); // Update user in Zustand store
+      toast({
+        title: 'Profile Updated',
+        description: 'Your profile information has been successfully updated.',
+      });
+    } catch (error) {
+        console.error("Error updating profile:", error);
+        toast({
+            variant: 'destructive',
+            title: 'Update Failed',
+            description: (error as Error).message || 'Could not update profile.',
+        });
+    } finally {
+        setIsLoading(false);
+    }
   };
   
-  const getInitials = (name?: string) => {
-    if (!name) return 'U';
-    const names = name.split(' ');
-    if (names.length > 1) {
+  const getInitials = (name?: string | null, fallbackName?: string | null) => {
+    const targetName = name || fallbackName;
+    if (!targetName) return 'U';
+    const names = targetName.split(' ');
+    if (names.length > 1 && names[0] && names[names.length - 1]) {
       return `${names[0][0]}${names[names.length - 1][0]}`.toUpperCase();
     }
-    return name.substring(0, 2).toUpperCase();
+    return targetName.substring(0, 2).toUpperCase();
   };
 
   return (
@@ -88,7 +118,7 @@ export default function ProfilePage() {
             </Avatar>
             <div>
               <CardTitle className="text-2xl">{user.first_name} {user.last_name}</CardTitle>
-              <CardDescription>@{user.username} &bull; Role: {user.isSuperAdmin ? "Admin" : user.role}</CardDescription>
+              <CardDescription>@{user.username} &bull; Role: {user.is_super_admin ? "Admin" : user.role}</CardDescription>
             </div>
           </div>
         </CardHeader>
@@ -116,7 +146,7 @@ export default function ProfilePage() {
                     <FormItem>
                       <FormLabel>Phone Number</FormLabel>
                       <FormControl>
-                        <Input placeholder="+251 912 345 678" {...field} />
+                        <Input placeholder="+251 912 345 678" {...field} value={field.value || ''}/>
                       </FormControl>
                       <FormMessage />
                     </FormItem>
@@ -132,7 +162,7 @@ export default function ProfilePage() {
                     <FormItem>
                       <FormLabel>Address</FormLabel>
                       <FormControl>
-                        <Textarea placeholder="Your residential address" {...field} />
+                        <Textarea placeholder="Your residential address" {...field} value={field.value || ''}/>
                       </FormControl>
                       <FormMessage />
                     </FormItem>
@@ -148,7 +178,7 @@ export default function ProfilePage() {
                     <FormItem>
                       <FormLabel>Office Location</FormLabel>
                       <FormControl>
-                        <Input placeholder="e.g., Block C, Room 102" {...field} />
+                        <Input placeholder="e.g., Block C, Room 102" {...field} value={field.value || ''}/>
                       </FormControl>
                       <FormMessage />
                     </FormItem>
@@ -164,7 +194,7 @@ export default function ProfilePage() {
                     <FormItem>
                       <FormLabel>Job Title</FormLabel>
                       <FormControl>
-                        <Input placeholder="e.g., Registrar" {...field} />
+                        <Input placeholder="e.g., Registrar" {...field} value={field.value || ''}/>
                       </FormControl>
                       <FormMessage />
                     </FormItem>
@@ -174,7 +204,7 @@ export default function ProfilePage() {
               
               <div className="flex justify-end">
                 <Button type="submit" disabled={isLoading}>
-                  <Save className="mr-2 h-4 w-4" />
+                  {isLoading ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <Save className="mr-2 h-4 w-4" />}
                   {isLoading ? 'Saving...' : 'Save Changes'}
                 </Button>
               </div>

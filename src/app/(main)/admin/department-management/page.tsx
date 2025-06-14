@@ -1,8 +1,7 @@
 // src/app/(main)/admin/department-management/page.tsx
-
 'use client';
 
-import { useEffect, useState, useMemo } from 'react';
+import { useEffect, useState, useMemo, startTransition } from 'react';
 import PageHeader from '@/components/shared/PageHeader';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
@@ -12,12 +11,12 @@ import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, Di
 import { useAuthStore } from '@/store/authStore';
 import { useRouter } from 'next/navigation';
 import { Building, ShieldAlert, PlusCircle, Edit, Trash2, MoreHorizontal, Loader2 } from 'lucide-react';
-import { mockDepartments } from '@/lib/data';
-import type { Department } from '@/types';
+import type { Department } from '@prisma/client';
 import AddDepartmentForm from '@/components/departments/AddDepartmentForm';
 import EditDepartmentForm from '@/components/departments/EditDepartmentForm';
 import { type DepartmentFormData } from '@/lib/schemas';
 import { useToast } from '@/hooks/use-toast';
+import { getAllDepartments, createDepartment, updateDepartment, deleteDepartment } from '@/actions/departmentActions';
 
 const ITEMS_PER_PAGE = 10;
 
@@ -26,16 +25,31 @@ export default function DepartmentManagementPage() {
   const router = useRouter();
   const { toast } = useToast();
 
-  const [departmentsList, setDepartmentsList] = useState<Department[]>(mockDepartments);
+  const [departmentsList, setDepartmentsList] = useState<Department[]>([]);
+  const [isLoadingData, setIsLoadingData] = useState(true);
   const [currentPage, setCurrentPage] = useState(1);
   const [isAddDialogOpen, setIsAddDialogOpen] = useState(false);
   const [isEditDialogOpen, setIsEditDialogOpen] = useState(false);
   const [editingDepartment, setEditingDepartment] = useState<Department | null>(null);
   const [isSubmitting, setIsSubmitting] = useState(false);
 
+  const fetchDepartments = async () => {
+    setIsLoadingData(true);
+    try {
+      const data = await getAllDepartments();
+      setDepartmentsList(data);
+    } catch (error) {
+      toast({ variant: 'destructive', title: 'Error', description: 'Failed to load departments.' });
+    } finally {
+      setIsLoadingData(false);
+    }
+  };
+
   useEffect(() => {
-    if (user && !user.isSuperAdmin) {
+    if (user && !user.is_super_admin) { // Check is_super_admin
       router.replace('/dashboard');
+    } else {
+      fetchDepartments();
     }
   }, [user, router]);
 
@@ -59,65 +73,63 @@ export default function DepartmentManagementPage() {
     setIsEditDialogOpen(true);
   };
 
-  const handleDeleteDepartment = (departmentId: number) => {
+  const handleDeleteDepartment = async (departmentId: number) => {
     const departmentToDelete = departmentsList.find(d => d.department_id === departmentId);
     if (!departmentToDelete) return;
+    
+    if (!confirm(`Are you sure you want to delete department "${departmentToDelete.name}"? This action cannot be undone.`)) {
+        return;
+    }
 
-    setDepartmentsList(prev => prev.filter(d => d.department_id !== departmentId));
-    toast({ title: 'Department Deleted (Mock)', description: `Department "${departmentToDelete.name}" has been removed.` });
+    setIsSubmitting(true); // Indicate loading for delete
+    try {
+      await deleteDepartment(departmentId);
+      toast({ title: 'Department Deleted', description: `Department "${departmentToDelete.name}" has been removed.` });
+      startTransition(() => {
+         fetchDepartments(); // Re-fetch
+      });
+    } catch (error) {
+      toast({ variant: 'destructive', title: 'Error', description: (error as Error).message || 'Failed to delete department.' });
+    } finally {
+        setIsSubmitting(false);
+    }
   };
   
   const handleAddDepartmentSubmit = async (data: DepartmentFormData) => {
     setIsSubmitting(true);
-    await new Promise(resolve => setTimeout(resolve, 1000)); // Simulate API call
-
-    const newDepartmentId = Math.max(...departmentsList.map(d => d.department_id), 0) + 1;
-    const newDepartment: Department = {
-      department_id: newDepartmentId,
-      name: data.name,
-      description: data.description || null,
-      created_at: new Date().toISOString(),
-      updated_at: new Date().toISOString(),
-    };
-
-    setDepartmentsList(prev => [newDepartment, ...prev]);
-    
-    toast({
-      title: 'Department Created (Mock)',
-      description: `Department "${data.name}" has been created.`,
-    });
-    setIsSubmitting(false);
-    setIsAddDialogOpen(false);
+    try {
+      await createDepartment(data);
+      toast({ title: 'Department Created', description: `Department "${data.name}" has been created.` });
+      setIsAddDialogOpen(false);
+      startTransition(() => {
+         fetchDepartments(); // Re-fetch
+      });
+    } catch (error) {
+      toast({ variant: 'destructive', title: 'Error', description: (error as Error).message || 'Failed to create department.' });
+    } finally {
+      setIsSubmitting(false);
+    }
   };
 
   const handleEditDepartmentSubmit = async (data: DepartmentFormData) => {
     if (!editingDepartment) return;
     setIsSubmitting(true);
-    await new Promise(resolve => setTimeout(resolve, 1000)); // Simulate API call
-
-    setDepartmentsList(prev => 
-      prev.map(d => 
-        d.department_id === editingDepartment.department_id 
-          ? { 
-              ...d, 
-              name: data.name,
-              description: data.description || null,
-              updated_at: new Date().toISOString(),
-            } 
-          : d
-      )
-    );
-    
-    toast({
-      title: 'Department Updated (Mock)',
-      description: `Department "${data.name}" has been updated.`,
-    });
-    setIsSubmitting(false);
-    setIsEditDialogOpen(false);
-    setEditingDepartment(null);
+    try {
+      await updateDepartment(editingDepartment.department_id, data);
+      toast({ title: 'Department Updated', description: `Department "${data.name}" has been updated.` });
+      setIsEditDialogOpen(false);
+      setEditingDepartment(null);
+      startTransition(() => {
+         fetchDepartments(); // Re-fetch
+      });
+    } catch (error) {
+      toast({ variant: 'destructive', title: 'Error', description: (error as Error).message || 'Failed to update department.' });
+    } finally {
+      setIsSubmitting(false);
+    }
   };
 
-  if (!user || !user.isSuperAdmin) {
+  if (!user || !user.is_super_admin) {
     return (
       <div className="flex flex-col items-center justify-center min-h-[calc(100vh-10rem)] text-center">
         <ShieldAlert className="w-16 h-16 text-destructive mb-4" />
@@ -126,12 +138,17 @@ export default function DepartmentManagementPage() {
       </div>
     );
   }
+  
+  if (isLoadingData) {
+    return <div className="flex justify-center items-center min-h-[calc(100vh-10rem)]"><Loader2 className="h-8 w-8 animate-spin" /></div>;
+  }
+
 
   return (
     <div className="space-y-6">
       <PageHeader 
         title="Department Management" 
-        description="Create, edit, and manage academic departments (Admin)."
+        description="Create, edit, and manage academic departments."
         icon={Building}
         action={
           <Dialog open={isAddDialogOpen} onOpenChange={setIsAddDialogOpen}>
@@ -178,7 +195,7 @@ export default function DepartmentManagementPage() {
                     <TableCell className="text-right">
                       <DropdownMenu>
                         <DropdownMenuTrigger asChild>
-                          <Button variant="ghost" size="icon">
+                          <Button variant="ghost" size="icon" disabled={isSubmitting}>
                             <MoreHorizontal className="h-4 w-4" />
                             <span className="sr-only">Actions</span>
                           </Button>

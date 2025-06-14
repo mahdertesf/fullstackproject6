@@ -1,8 +1,7 @@
 // src/app/(main)/admin/infrastructure/page.tsx
-
 'use client';
 
-import { useEffect, useState, useMemo } from 'react';
+import { useEffect, useState, useMemo, startTransition } from 'react';
 import PageHeader from '@/components/shared/PageHeader';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
@@ -11,17 +10,21 @@ import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigge
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog';
 import { useAuthStore } from '@/store/authStore';
 import { useRouter } from 'next/navigation';
-import { HardHat, ShieldAlert, PlusCircle, Edit, Trash2, MoreHorizontal, DoorOpen } from 'lucide-react';
-import { mockBuildings, mockRooms } from '@/lib/data';
-import type { Building, Room } from '@/types';
+import { HardHat, ShieldAlert, PlusCircle, Edit, Trash2, MoreHorizontal, DoorOpen, Loader2 } from 'lucide-react';
+import type { Building, Room as PrismaRoom } from '@prisma/client';
 import AddBuildingForm from '@/components/infrastructure/buildings/AddBuildingForm';
 import EditBuildingForm from '@/components/infrastructure/buildings/EditBuildingForm';
 import AddRoomForm from '@/components/infrastructure/rooms/AddRoomForm';
 import EditRoomForm from '@/components/infrastructure/rooms/EditRoomForm';
 import { type BuildingFormData, type RoomFormData } from '@/lib/schemas';
 import { useToast } from '@/hooks/use-toast';
+import { 
+    getAllBuildings, createBuilding, updateBuilding, deleteBuilding,
+    getAllRoomsWithBuilding, createRoom, updateRoom, deleteRoom, type RoomWithBuilding
+} from '@/actions/infrastructureActions';
 
-const ITEMS_PER_PAGE = 5; // Adjusted for potentially two tables
+
+const ITEMS_PER_PAGE = 5; 
 
 export default function InfrastructureManagementPage() {
   const { user } = useAuthStore();
@@ -29,7 +32,8 @@ export default function InfrastructureManagementPage() {
   const { toast } = useToast();
 
   // Building States
-  const [buildingsList, setBuildingsList] = useState<Building[]>(mockBuildings);
+  const [buildingsList, setBuildingsList] = useState<Building[]>([]);
+  const [isLoadingBuildings, setIsLoadingBuildings] = useState(true);
   const [currentBuildingPage, setCurrentBuildingPage] = useState(1);
   const [isAddBuildingDialogOpen, setIsAddBuildingDialogOpen] = useState(false);
   const [isEditBuildingDialogOpen, setIsEditBuildingDialogOpen] = useState(false);
@@ -37,17 +41,37 @@ export default function InfrastructureManagementPage() {
   const [isBuildingSubmitting, setIsBuildingSubmitting] = useState(false);
 
   // Room States
-  const [roomsList, setRoomsList] = useState<Room[]>(mockRooms);
+  const [roomsList, setRoomsList] = useState<RoomWithBuilding[]>([]);
+  const [isLoadingRooms, setIsLoadingRooms] = useState(true);
   const [currentRoomPage, setCurrentRoomPage] = useState(1);
   const [isAddRoomDialogOpen, setIsAddRoomDialogOpen] = useState(false);
   const [isEditRoomDialogOpen, setIsEditRoomDialogOpen] = useState(false);
-  const [editingRoom, setEditingRoom] = useState<Room | null>(null);
+  const [editingRoom, setEditingRoom] = useState<RoomWithBuilding | null>(null);
   const [isRoomSubmitting, setIsRoomSubmitting] = useState(false);
 
+  const fetchAllData = async () => {
+    setIsLoadingBuildings(true);
+    setIsLoadingRooms(true);
+    try {
+      const [buildingsData, roomsData] = await Promise.all([
+        getAllBuildings(),
+        getAllRoomsWithBuilding()
+      ]);
+      setBuildingsList(buildingsData);
+      setRoomsList(roomsData);
+    } catch (error) {
+      toast({ variant: 'destructive', title: 'Error', description: 'Failed to load infrastructure data.' });
+    } finally {
+      setIsLoadingBuildings(false);
+      setIsLoadingRooms(false);
+    }
+  };
 
   useEffect(() => {
-    if (user && !user.isSuperAdmin) {
+    if (user && !user.is_super_admin) {
       router.replace('/dashboard');
+    } else if (user?.is_super_admin) {
+      fetchAllData();
     }
   }, [user, router]);
 
@@ -61,139 +85,91 @@ export default function InfrastructureManagementPage() {
   const totalBuildingPages = Math.ceil(buildingsList.length / ITEMS_PER_PAGE);
 
   const handleBuildingPageChange = (page: number) => {
-    if (page >= 1 && page <= totalBuildingPages) {
-      setCurrentBuildingPage(page);
-    }
+    if (page >= 1 && page <= totalBuildingPages) setCurrentBuildingPage(page);
   };
-
   const handleOpenEditBuildingDialog = (building: Building) => {
-    setEditingBuilding(building);
-    setIsEditBuildingDialogOpen(true);
+    setEditingBuilding(building); setIsEditBuildingDialogOpen(true);
   };
-
-  const handleDeleteBuilding = (buildingId: number) => {
-    const buildingToDelete = buildingsList.find(b => b.building_id === buildingId);
-    if (!buildingToDelete) return;
-    // Also check if rooms are associated with this building before deleting (future enhancement)
-    setBuildingsList(prev => prev.filter(b => b.building_id !== buildingId));
-    toast({ title: 'Building Deleted (Mock)', description: `Building "${buildingToDelete.name}" has been removed.` });
+  const handleDeleteBuildingSubmit = async (buildingId: number) => {
+    if (!confirm('Are you sure you want to delete this building? This may affect associated rooms.')) return;
+    setIsBuildingSubmitting(true);
+    try {
+      await deleteBuilding(buildingId);
+      toast({ title: 'Building Deleted' });
+      startTransition(fetchAllData);
+    } catch (error) { toast({ variant: 'destructive', title: 'Error', description: (error as Error).message }); }
+    finally { setIsBuildingSubmitting(false); }
   };
-  
   const handleAddBuildingSubmit = async (data: BuildingFormData) => {
     setIsBuildingSubmitting(true);
-    await new Promise(resolve => setTimeout(resolve, 1000)); 
-
-    const newBuildingId = Math.max(...buildingsList.map(b => b.building_id), 0) + 1;
-    const newBuilding: Building = {
-      building_id: newBuildingId,
-      name: data.name,
-      address: data.address || null,
-      created_at: new Date().toISOString(),
-      updated_at: new Date().toISOString(),
-    };
-    setBuildingsList(prev => [newBuilding, ...prev].sort((a,b) => a.name.localeCompare(b.name)));
-    toast({ title: 'Building Created (Mock)', description: `Building "${data.name}" has been created.` });
-    setIsBuildingSubmitting(false);
-    setIsAddBuildingDialogOpen(false);
+    try {
+      await createBuilding(data);
+      toast({ title: 'Building Created' });
+      setIsAddBuildingDialogOpen(false);
+      startTransition(fetchAllData);
+    } catch (error) { toast({ variant: 'destructive', title: 'Error', description: (error as Error).message }); }
+    finally { setIsBuildingSubmitting(false); }
   };
-
   const handleEditBuildingSubmit = async (data: BuildingFormData) => {
     if (!editingBuilding) return;
     setIsBuildingSubmitting(true);
-    await new Promise(resolve => setTimeout(resolve, 1000));
-    setBuildingsList(prev => 
-      prev.map(b => 
-        b.building_id === editingBuilding.building_id 
-          ? { ...b, name: data.name, address: data.address || null, updated_at: new Date().toISOString() } 
-          : b
-      ).sort((a,b) => a.name.localeCompare(b.name))
-    );
-    toast({ title: 'Building Updated (Mock)', description: `Building "${data.name}" has been updated.` });
-    setIsBuildingSubmitting(false);
-    setIsEditBuildingDialogOpen(false);
-    setEditingBuilding(null);
+    try {
+      await updateBuilding(editingBuilding.building_id, data);
+      toast({ title: 'Building Updated' });
+      setIsEditBuildingDialogOpen(false); setEditingBuilding(null);
+      startTransition(fetchAllData);
+    } catch (error) { toast({ variant: 'destructive', title: 'Error', description: (error as Error).message }); }
+    finally { setIsBuildingSubmitting(false); }
   };
 
   // Room Logic
-  const enrichedRoomsList = useMemo(() => {
-    return roomsList.map(room => ({
-      ...room,
-      buildingName: buildingsList.find(b => b.building_id === room.building_id)?.name || 'Unknown Building'
-    })).sort((a, b) => a.buildingName.localeCompare(b.buildingName) || a.room_number.localeCompare(b.room_number));
-  }, [roomsList, buildingsList]);
-
-
   const paginatedRooms = useMemo(() => {
-    return enrichedRoomsList.slice(
+    return roomsList.slice(
       (currentRoomPage - 1) * ITEMS_PER_PAGE,
       currentRoomPage * ITEMS_PER_PAGE
     );
-  }, [enrichedRoomsList, currentRoomPage]);
-  const totalRoomPages = Math.ceil(enrichedRoomsList.length / ITEMS_PER_PAGE);
+  }, [roomsList, currentRoomPage]);
+  const totalRoomPages = Math.ceil(roomsList.length / ITEMS_PER_PAGE);
 
   const handleRoomPageChange = (page: number) => {
-    if (page >= 1 && page <= totalRoomPages) {
-      setCurrentRoomPage(page);
-    }
+    if (page >= 1 && page <= totalRoomPages) setCurrentRoomPage(page);
   };
-
-  const handleOpenEditRoomDialog = (room: Room) => {
-    setEditingRoom(room);
-    setIsEditRoomDialogOpen(true);
+  const handleOpenEditRoomDialog = (room: RoomWithBuilding) => {
+    setEditingRoom(room); setIsEditRoomDialogOpen(true);
   };
-
-  const handleDeleteRoom = (roomId: number) => {
-    const roomToDelete = roomsList.find(r => r.room_id === roomId);
-    if (!roomToDelete) return;
-    setRoomsList(prev => prev.filter(r => r.room_id !== roomId));
-    toast({ title: 'Room Deleted (Mock)', description: `Room "${roomToDelete.room_number}" has been removed.` });
+  const handleDeleteRoomSubmit = async (roomId: number) => {
+    if (!confirm('Are you sure you want to delete this room?')) return;
+    setIsRoomSubmitting(true);
+    try {
+      await deleteRoom(roomId);
+      toast({ title: 'Room Deleted' });
+      startTransition(fetchAllData);
+    } catch (error) { toast({ variant: 'destructive', title: 'Error', description: (error as Error).message }); }
+    finally { setIsRoomSubmitting(false); }
   };
-
   const handleAddRoomSubmit = async (data: RoomFormData) => {
     setIsRoomSubmitting(true);
-    await new Promise(resolve => setTimeout(resolve, 1000));
-    const newRoomId = Math.max(...roomsList.map(r => r.room_id), 0) + 1;
-    const newRoom: Room = {
-      room_id: newRoomId,
-      building_id: parseInt(data.building_id),
-      room_number: data.room_number,
-      capacity: data.capacity,
-      type: data.type || null,
-      created_at: new Date().toISOString(),
-      updated_at: new Date().toISOString(),
-    };
-    setRoomsList(prev => [newRoom, ...prev]);
-    toast({ title: 'Room Created (Mock)', description: `Room "${data.room_number}" has been created.` });
-    setIsRoomSubmitting(false);
-    setIsAddRoomDialogOpen(false);
+    try {
+      await createRoom(data);
+      toast({ title: 'Room Created' });
+      setIsAddRoomDialogOpen(false);
+      startTransition(fetchAllData);
+    } catch (error) { toast({ variant: 'destructive', title: 'Error', description: (error as Error).message }); }
+    finally { setIsRoomSubmitting(false); }
   };
-
   const handleEditRoomSubmit = async (data: RoomFormData) => {
     if (!editingRoom) return;
     setIsRoomSubmitting(true);
-    await new Promise(resolve => setTimeout(resolve, 1000));
-    setRoomsList(prev =>
-      prev.map(r =>
-        r.room_id === editingRoom.room_id
-          ? {
-              ...r,
-              building_id: parseInt(data.building_id),
-              room_number: data.room_number,
-              capacity: data.capacity,
-              type: data.type || null,
-              updated_at: new Date().toISOString(),
-            }
-          : r
-      )
-    );
-    toast({ title: 'Room Updated (Mock)', description: `Room "${data.room_number}" has been updated.` });
-    setIsRoomSubmitting(false);
-    setIsEditRoomDialogOpen(false);
-    setEditingRoom(null);
+    try {
+      await updateRoom(editingRoom.room_id, data);
+      toast({ title: 'Room Updated' });
+      setIsEditRoomDialogOpen(false); setEditingRoom(null);
+      startTransition(fetchAllData);
+    } catch (error) { toast({ variant: 'destructive', title: 'Error', description: (error as Error).message }); }
+    finally { setIsRoomSubmitting(false); }
   };
 
-
-  if (!user || !user.isSuperAdmin) {
+  if (!user || !user.is_super_admin) {
     return (
       <div className="flex flex-col items-center justify-center min-h-[calc(100vh-10rem)] text-center">
         <ShieldAlert className="w-16 h-16 text-destructive mb-4" />
@@ -202,63 +178,52 @@ export default function InfrastructureManagementPage() {
       </div>
     );
   }
+  
+  const isLoading = isLoadingBuildings || isLoadingRooms;
 
   return (
     <div className="space-y-8">
       <PageHeader 
         title="Campus Infrastructure" 
-        description="Manage university buildings and rooms (Admin)."
+        description="Manage university buildings and rooms."
         icon={HardHat}
       />
       
+      {isLoading ? <div className="flex justify-center items-center p-8"><Loader2 className="h-8 w-8 animate-spin" /></div> : (
+      <>
       {/* Building Management Section */}
       <Card>
         <CardHeader className="flex flex-row items-center justify-between">
           <CardTitle>Manage Buildings</CardTitle>
           <Dialog open={isAddBuildingDialogOpen} onOpenChange={setIsAddBuildingDialogOpen}>
             <DialogTrigger asChild>
-              <Button>
-                <PlusCircle className="mr-2 h-4 w-4" /> Add New Building
-              </Button>
+              <Button><PlusCircle className="mr-2 h-4 w-4" /> Add New Building</Button>
             </DialogTrigger>
             <DialogContent className="sm:max-w-[600px]">
-              <DialogHeader>
-                <DialogTitle>Add New Building</DialogTitle>
-                <DialogDescription>Fill in the details to create a new campus building.</DialogDescription>
-              </DialogHeader>
+              <DialogHeader><DialogTitle>Add New Building</DialogTitle><DialogDescription>Fill in details.</DialogDescription></DialogHeader>
               <AddBuildingForm onSubmit={handleAddBuildingSubmit} onCancel={() => setIsAddBuildingDialogOpen(false)} isSubmitting={isBuildingSubmitting} />
             </DialogContent>
           </Dialog>
         </CardHeader>
         <CardContent>
           <Table>
-            <TableHeader>
-              <TableRow>
-                <TableHead>Name</TableHead>
-                <TableHead>Address</TableHead>
-                <TableHead className="text-right">Actions</TableHead>
-              </TableRow>
-            </TableHeader>
+            <TableHeader><TableRow><TableHead>Name</TableHead><TableHead>Address</TableHead><TableHead className="text-right">Actions</TableHead></TableRow></TableHeader>
             <TableBody>
-              {paginatedBuildings.length > 0 ? (
-                paginatedBuildings.map((building) => (
-                  <TableRow key={building.building_id}>
-                    <TableCell className="font-medium">{building.name}</TableCell>
-                    <TableCell className="text-sm text-muted-foreground truncate max-w-xs">{building.address || 'N/A'}</TableCell>
-                    <TableCell className="text-right">
-                      <DropdownMenu>
-                        <DropdownMenuTrigger asChild><Button variant="ghost" size="icon"><MoreHorizontal className="h-4 w-4" /><span className="sr-only">Actions</span></Button></DropdownMenuTrigger>
-                        <DropdownMenuContent align="end">
-                          <DropdownMenuItem onClick={() => handleOpenEditBuildingDialog(building)}><Edit className="mr-2 h-4 w-4" /> Edit</DropdownMenuItem>
-                          <DropdownMenuItem onClick={() => handleDeleteBuilding(building.building_id)} className="text-destructive focus:text-destructive focus:bg-destructive/10"><Trash2 className="mr-2 h-4 w-4" /> Delete</DropdownMenuItem>
-                        </DropdownMenuContent>
-                      </DropdownMenu>
-                    </TableCell>
-                  </TableRow>
-                ))
-              ) : (
-                <TableRow><TableCell colSpan={3} className="text-center h-24">No buildings found. Add one to get started.</TableCell></TableRow>
-              )}
+              {paginatedBuildings.length > 0 ? paginatedBuildings.map(b => (
+                <TableRow key={b.building_id}>
+                  <TableCell className="font-medium">{b.name}</TableCell>
+                  <TableCell className="text-sm text-muted-foreground truncate max-w-xs">{b.address || 'N/A'}</TableCell>
+                  <TableCell className="text-right">
+                    <DropdownMenu>
+                      <DropdownMenuTrigger asChild><Button variant="ghost" size="icon" disabled={isBuildingSubmitting}><MoreHorizontal className="h-4 w-4" /></Button></DropdownMenuTrigger>
+                      <DropdownMenuContent align="end">
+                        <DropdownMenuItem onClick={() => handleOpenEditBuildingDialog(b)}><Edit className="mr-2 h-4 w-4" /> Edit</DropdownMenuItem>
+                        <DropdownMenuItem onClick={() => handleDeleteBuildingSubmit(b.building_id)} className="text-destructive focus:text-destructive focus:bg-destructive/10"><Trash2 className="mr-2 h-4 w-4" /> Delete</DropdownMenuItem>
+                      </DropdownMenuContent>
+                    </DropdownMenu>
+                  </TableCell>
+                </TableRow>
+              )) : <TableRow><TableCell colSpan={3} className="text-center h-24">No buildings found.</TableCell></TableRow>}
             </TableBody>
           </Table>
         </CardContent>
@@ -271,9 +236,9 @@ export default function InfrastructureManagementPage() {
         </div>
       )}
       {editingBuilding && (
-        <Dialog open={isEditBuildingDialogOpen} onOpenChange={(isOpen) => { setIsEditBuildingDialogOpen(isOpen); if (!isOpen) setEditingBuilding(null); }}>
+        <Dialog open={isEditBuildingDialogOpen} onOpenChange={v => { setIsEditBuildingDialogOpen(v); if (!v) setEditingBuilding(null); }}>
           <DialogContent className="sm:max-w-[600px]">
-            <DialogHeader><DialogTitle>Edit Building: {editingBuilding.name}</DialogTitle><DialogDescription>Modify the building details below.</DialogDescription></DialogHeader>
+            <DialogHeader><DialogTitle>Edit Building: {editingBuilding.name}</DialogTitle></DialogHeader>
             <EditBuildingForm buildingToEdit={editingBuilding} onSubmit={handleEditBuildingSubmit} onCancel={() => { setIsEditBuildingDialogOpen(false); setEditingBuilding(null); }} isSubmitting={isBuildingSubmitting} />
           </DialogContent>
         </Dialog>
@@ -284,53 +249,34 @@ export default function InfrastructureManagementPage() {
         <CardHeader className="flex flex-row items-center justify-between">
           <CardTitle className="flex items-center"><DoorOpen className="mr-2 h-5 w-5 text-primary" /> Manage Rooms</CardTitle>
            <Dialog open={isAddRoomDialogOpen} onOpenChange={setIsAddRoomDialogOpen}>
-            <DialogTrigger asChild>
-              <Button>
-                <PlusCircle className="mr-2 h-4 w-4" /> Add New Room
-              </Button>
-            </DialogTrigger>
+            <DialogTrigger asChild><Button><PlusCircle className="mr-2 h-4 w-4" /> Add New Room</Button></DialogTrigger>
             <DialogContent className="sm:max-w-[600px]">
-              <DialogHeader>
-                <DialogTitle>Add New Room</DialogTitle>
-                <DialogDescription>Fill in the details to create a new room.</DialogDescription>
-              </DialogHeader>
+              <DialogHeader><DialogTitle>Add New Room</DialogTitle></DialogHeader>
               <AddRoomForm buildings={buildingsList} onSubmit={handleAddRoomSubmit} onCancel={() => setIsAddRoomDialogOpen(false)} isSubmitting={isRoomSubmitting} />
             </DialogContent>
           </Dialog>
         </CardHeader>
         <CardContent>
           <Table>
-            <TableHeader>
-              <TableRow>
-                <TableHead>Room Number</TableHead>
-                <TableHead>Building</TableHead>
-                <TableHead>Capacity</TableHead>
-                <TableHead>Type</TableHead>
-                <TableHead className="text-right">Actions</TableHead>
-              </TableRow>
-            </TableHeader>
+            <TableHeader><TableRow><TableHead>Room Number</TableHead><TableHead>Building</TableHead><TableHead>Capacity</TableHead><TableHead>Type</TableHead><TableHead className="text-right">Actions</TableHead></TableRow></TableHeader>
             <TableBody>
-              {paginatedRooms.length > 0 ? (
-                paginatedRooms.map((room) => (
-                  <TableRow key={room.room_id}>
-                    <TableCell className="font-medium">{room.room_number}</TableCell>
-                    <TableCell>{(room as any).buildingName || 'N/A'}</TableCell>
-                    <TableCell>{room.capacity}</TableCell>
-                    <TableCell className="text-sm text-muted-foreground">{room.type || 'N/A'}</TableCell>
-                    <TableCell className="text-right">
-                      <DropdownMenu>
-                        <DropdownMenuTrigger asChild><Button variant="ghost" size="icon"><MoreHorizontal className="h-4 w-4" /><span className="sr-only">Actions</span></Button></DropdownMenuTrigger>
-                        <DropdownMenuContent align="end">
-                          <DropdownMenuItem onClick={() => handleOpenEditRoomDialog(room)}><Edit className="mr-2 h-4 w-4" /> Edit</DropdownMenuItem>
-                          <DropdownMenuItem onClick={() => handleDeleteRoom(room.room_id)} className="text-destructive focus:text-destructive focus:bg-destructive/10"><Trash2 className="mr-2 h-4 w-4" /> Delete</DropdownMenuItem>
-                        </DropdownMenuContent>
-                      </DropdownMenu>
-                    </TableCell>
-                  </TableRow>
-                ))
-              ) : (
-                <TableRow><TableCell colSpan={5} className="text-center h-24">No rooms found. Add one to get started.</TableCell></TableRow>
-              )}
+              {paginatedRooms.length > 0 ? paginatedRooms.map(r => (
+                <TableRow key={r.room_id}>
+                  <TableCell className="font-medium">{r.room_number}</TableCell>
+                  <TableCell>{r.building?.name || 'N/A'}</TableCell>
+                  <TableCell>{r.capacity}</TableCell>
+                  <TableCell className="text-sm text-muted-foreground">{r.type || 'N/A'}</TableCell>
+                  <TableCell className="text-right">
+                    <DropdownMenu>
+                      <DropdownMenuTrigger asChild><Button variant="ghost" size="icon" disabled={isRoomSubmitting}><MoreHorizontal className="h-4 w-4" /></Button></DropdownMenuTrigger>
+                      <DropdownMenuContent align="end">
+                        <DropdownMenuItem onClick={() => handleOpenEditRoomDialog(r)}><Edit className="mr-2 h-4 w-4" /> Edit</DropdownMenuItem>
+                        <DropdownMenuItem onClick={() => handleDeleteRoomSubmit(r.room_id)} className="text-destructive focus:text-destructive focus:bg-destructive/10"><Trash2 className="mr-2 h-4 w-4" /> Delete</DropdownMenuItem>
+                      </DropdownMenuContent>
+                    </DropdownMenu>
+                  </TableCell>
+                </TableRow>
+              )) : <TableRow><TableCell colSpan={5} className="text-center h-24">No rooms found.</TableCell></TableRow>}
             </TableBody>
           </Table>
         </CardContent>
@@ -343,12 +289,14 @@ export default function InfrastructureManagementPage() {
         </div>
       )}
       {editingRoom && (
-        <Dialog open={isEditRoomDialogOpen} onOpenChange={(isOpen) => { setIsEditRoomDialogOpen(isOpen); if (!isOpen) setEditingRoom(null); }}>
+        <Dialog open={isEditRoomDialogOpen} onOpenChange={v => { setIsEditRoomDialogOpen(v); if (!v) setEditingRoom(null); }}>
           <DialogContent className="sm:max-w-[600px]">
-            <DialogHeader><DialogTitle>Edit Room: {editingRoom.room_number}</DialogTitle><DialogDescription>Modify the room details below.</DialogDescription></DialogHeader>
-            <EditRoomForm roomToEdit={editingRoom} buildings={buildingsList} onSubmit={handleEditRoomSubmit} onCancel={() => { setIsEditRoomDialogOpen(false); setEditingRoom(null); }} isSubmitting={isRoomSubmitting} />
+            <DialogHeader><DialogTitle>Edit Room: {editingRoom.room_number}</DialogTitle></DialogHeader>
+            <EditRoomForm roomToEdit={editingRoom as PrismaRoom} buildings={buildingsList} onSubmit={handleEditRoomSubmit} onCancel={() => { setIsEditRoomDialogOpen(false); setEditingRoom(null); }} isSubmitting={isRoomSubmitting} />
           </DialogContent>
         </Dialog>
+      )}
+      </>
       )}
     </div>
   );

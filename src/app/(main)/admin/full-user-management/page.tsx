@@ -1,8 +1,7 @@
 // src/app/(main)/admin/full-user-management/page.tsx
-
 'use client';
 
-import { useEffect, useState, useMemo } from 'react';
+import { useEffect, useState, useMemo, startTransition } from 'react';
 import PageHeader from '@/components/shared/PageHeader';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
@@ -14,18 +13,18 @@ import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, Di
 import { useAuthStore } from '@/store/authStore';
 import { useRouter } from 'next/navigation';
 import { Users, ShieldAlert, PlusCircle, Edit, Trash2, Search, Filter, MoreHorizontal, Loader2 } from 'lucide-react';
-import { mockUserProfiles } from '@/lib/data';
-import type { UserProfile, UserRole } from '@/types';
+import type { UserProfile as FullUserProfile, UserRole } from '@prisma/client'; // Use Prisma types
 import { Badge } from '@/components/ui/badge';
 import AddUserForm from '@/components/users/AddUserForm';
 import EditUserForm from '@/components/users/EditUserForm';
 import { NewUserFormData, EditUserFormData } from '@/lib/schemas';
 import { useToast } from '@/hooks/use-toast';
+import { getAllUsers, createUser, updateUser, deleteUser } from '@/actions/userActions';
 
 const ITEMS_PER_PAGE = 10;
 
 export default function FullUserManagementPage() {
-  const { user } = useAuthStore();
+  const { user: currentUser } = useAuthStore();
   const router = useRouter();
   const { toast } = useToast();
 
@@ -34,119 +33,105 @@ export default function FullUserManagementPage() {
   const [currentPage, setCurrentPage] = useState(1);
   const [isAddUserDialogOpen, setIsAddUserDialogOpen] = useState(false);
   const [isEditUserDialogOpen, setIsEditUserDialogOpen] = useState(false);
-  const [editingUser, setEditingUser] = useState<UserProfile | null>(null);
+  const [editingUser, setEditingUser] = useState<FullUserProfile | null>(null);
   const [isSubmitting, setIsSubmitting] = useState(false);
-  const [usersList, setUsersList] = useState<UserProfile[]>(mockUserProfiles);
+  const [isLoadingData, setIsLoadingData] = useState(true);
+  const [usersList, setUsersList] = useState<FullUserProfile[]>([]);
 
+  const fetchUsers = async () => {
+    setIsLoadingData(true);
+    try {
+      const data = await getAllUsers({ searchTerm, role: selectedRole }, currentUser?.user_id, currentUser?.is_super_admin);
+      setUsersList(data);
+    } catch (error) {
+      toast({ variant: 'destructive', title: 'Error', description: 'Failed to load users.' });
+    } finally {
+      setIsLoadingData(false);
+    }
+  };
+  
+  useEffect(() => {
+    if (currentUser && !currentUser.is_super_admin) {
+      router.replace('/dashboard'); 
+    } else if (currentUser?.is_super_admin) {
+      fetchUsers();
+    }
+  }, [currentUser, router]);
 
   useEffect(() => {
-    if (user && !user.isSuperAdmin) {
-      router.replace('/dashboard'); 
+    if (currentUser?.is_super_admin) {
+        // Debounce or use startTransition for search/filter
+        const handler = setTimeout(() => {
+             startTransition(() => { fetchUsers(); });
+        }, 300);
+        return () => clearTimeout(handler);
     }
-  }, [user, router]);
+  }, [searchTerm, selectedRole, currentUser?.is_super_admin]);
 
-  const filteredUsers = useMemo(() => {
-    return usersList.filter(u => {
-      const searchLower = searchTerm.toLowerCase();
-      const matchesSearch =
-        u.username.toLowerCase().includes(searchLower) ||
-        u.email.toLowerCase().includes(searchLower) ||
-        (u.first_name && u.first_name.toLowerCase().includes(searchLower)) ||
-        (u.last_name && u.last_name.toLowerCase().includes(searchLower));
 
-      const matchesRole = selectedRole === 'all' ? true : u.role === selectedRole;
-      return matchesSearch && matchesRole;
-    });
-  }, [searchTerm, selectedRole, usersList]);
-
-  const paginatedUsers = filteredUsers.slice(
+  const paginatedUsers = usersList.slice(
     (currentPage - 1) * ITEMS_PER_PAGE,
     currentPage * ITEMS_PER_PAGE
   );
+  const totalPages = Math.ceil(usersList.length / ITEMS_PER_PAGE);
   
-  const handleOpenEditDialog = (userToEdit: UserProfile) => {
+  const handleOpenEditDialog = (userToEdit: FullUserProfile) => {
     setEditingUser(userToEdit);
     setIsEditUserDialogOpen(true);
   };
 
   const handleEditUserSubmit = async (data: EditUserFormData) => {
-    if (!editingUser) return;
+    if (!editingUser || !currentUser) return;
     setIsSubmitting(true);
-    console.log("Editing user data (Admin):", editingUser.user_id, data);
-    
-    await new Promise(resolve => setTimeout(resolve, 1000)); // Simulate API call
-
-    setUsersList(prev => 
-      prev.map(u => 
-        u.user_id === editingUser.user_id 
-          ? { 
-              ...u, 
-              username: data.username,
-              email: data.email,
-              first_name: data.firstName,
-              last_name: data.lastName,
-              role: data.role,
-              is_active: data.is_active,
-              isSuperAdmin: data.role === 'Staff' ? (editingUser.isSuperAdmin || false) : u.isSuperAdmin && data.role !== 'Staff' ? false : u.isSuperAdmin,
-              updated_at: new Date().toISOString(),
-            } 
-          : u
-      )
-    );
-    
-    toast({
-      title: 'User Updated (Mock)',
-      description: `User ${data.username} has been updated.`,
-    });
-    setIsSubmitting(false);
-    setIsEditUserDialogOpen(false);
-    setEditingUser(null);
+    try {
+      await updateUser(editingUser.user_id, data, currentUser.user_id);
+      toast({ title: 'User Updated', description: `User ${data.username} has been updated.` });
+      setIsEditUserDialogOpen(false);
+      setEditingUser(null);
+      startTransition(() => { fetchUsers(); });
+    } catch (error) {
+      toast({ variant: 'destructive', title: 'Error', description: (error as Error).message || 'Failed to update user.' });
+    } finally {
+      setIsSubmitting(false);
+    }
   };
 
-  const handleDeleteUser = (userId: number) => {
+  const handleDeleteUser = async (userId: number) => {
     const userToDelete = usersList.find(u => u.user_id === userId);
-    if (!userToDelete) return;
+    if (!userToDelete || !currentUser) return;
 
-    if (userToDelete.isSuperAdmin && user?.user_id === userToDelete.user_id) {
-        toast({ variant: 'destructive', title: 'Action Denied', description: 'Super Admins cannot delete their own account.'});
+     if (!confirm(`Are you sure you want to delete user "${userToDelete.username}"? This action cannot be undone.`)) {
         return;
     }
-    console.log(`Attempting to delete user: ${userId}`);
-    setUsersList(prev => prev.filter(u => u.user_id !== userId));
-    toast({ title: 'User Deleted (Mock)', description: `User ${userToDelete.username} has been removed from the list.` });
+    setIsSubmitting(true); // General submitting state for delete as well
+    try {
+      await deleteUser(userId, currentUser.user_id);
+      toast({ title: 'User Deleted', description: `User ${userToDelete.username} has been removed.` });
+      startTransition(() => { fetchUsers(); });
+    } catch (error) {
+      toast({ variant: 'destructive', title: 'Error', description: (error as Error).message || 'Failed to delete user.' });
+    } finally {
+        setIsSubmitting(false);
+    }
   };
 
   const handleAddNewUser = async (data: NewUserFormData) => {
+    if (!currentUser) return;
     setIsSubmitting(true);
-    console.log("New user data (Admin):", data);
-    await new Promise(resolve => setTimeout(resolve, 1000)); 
-
-    const newUserId = Math.max(...usersList.map(u => u.user_id), 0) + 1;
-    const newUserProfile: UserProfile = {
-      user_id: newUserId,
-      username: data.username,
-      email: data.email,
-      role: data.role,
-      first_name: data.firstName,
-      last_name: data.lastName,
-      is_active: true, 
-      password_hash: 'mock_hash', 
-      created_at: new Date().toISOString(),
-      updated_at: new Date().toISOString(),
-      isSuperAdmin: data.role === 'Staff' ? false : undefined, 
-    };
-    setUsersList(prev => [newUserProfile, ...prev]);
-
-    toast({
-      title: 'User Created (Mock)',
-      description: `User ${data.username} has been created.`,
-    });
-    setIsSubmitting(false);
-    setIsAddUserDialogOpen(false);
+    try {
+      await createUser(data, currentUser.role, currentUser.is_super_admin);
+      toast({ title: 'User Created', description: `User ${data.username} has been created.` });
+      setIsAddUserDialogOpen(false);
+      startTransition(() => { fetchUsers(); });
+    } catch (error) {
+      toast({ variant: 'destructive', title: 'Error', description: (error as Error).message || 'Failed to create user.' });
+    } finally {
+      setIsSubmitting(false);
+    }
   };
 
 
-  if (!user || !user.isSuperAdmin) {
+  if (!currentUser || !currentUser.is_super_admin) {
     return (
       <div className="flex flex-col items-center justify-center min-h-[calc(100vh-10rem)] text-center">
         <ShieldAlert className="w-16 h-16 text-destructive mb-4" />
@@ -221,9 +206,12 @@ export default function FullUserManagementPage() {
         </div>
       </div>
       
+      {isLoadingData ? (
+         <div className="flex justify-center items-center p-8"><Loader2 className="h-8 w-8 animate-spin" /></div>
+      ) : (
       <Card>
         <CardHeader>
-          <CardTitle>All Users</CardTitle>
+          <CardTitle>All Users ({usersList.length})</CardTitle>
         </CardHeader>
         <CardContent>
            <Table>
@@ -249,7 +237,7 @@ export default function FullUserManagementPage() {
                     <TableCell>{u.email}</TableCell>
                     <TableCell>
                       <Badge variant={u.role === 'Student' ? 'secondary' : u.role === 'Teacher' ? 'outline' : 'default'}>
-                        {u.isSuperAdmin ? 'Super Admin' : u.role}
+                        {u.is_super_admin ? 'Super Admin' : u.role}
                       </Badge>
                     </TableCell>
                     <TableCell>
@@ -260,11 +248,10 @@ export default function FullUserManagementPage() {
                     <TableCell className="text-right">
                       <DropdownMenu>
                         <DropdownMenuTrigger asChild>
-                           {/* SuperAdmins cannot modify other SuperAdmins unless it's themselves. */}
                            <Button 
                             variant="ghost" 
                             size="icon" 
-                            disabled={u.isSuperAdmin && user?.user_id !== u.user_id}
+                            disabled={(u.is_super_admin && currentUser?.user_id !== u.user_id && !currentUser?.is_super_admin) || isSubmitting}
                            >
                             <MoreHorizontal className="h-4 w-4" />
                             <span className="sr-only">Actions</span>
@@ -273,14 +260,14 @@ export default function FullUserManagementPage() {
                         <DropdownMenuContent align="end">
                           <DropdownMenuItem 
                             onClick={() => handleOpenEditDialog(u)}
-                            disabled={u.isSuperAdmin && user?.user_id !== u.user_id}
+                            disabled={(u.is_super_admin && currentUser?.user_id !== u.user_id && !currentUser?.is_super_admin)}
                           >
                             <Edit className="mr-2 h-4 w-4" /> Edit
                           </DropdownMenuItem>
                           <DropdownMenuItem 
                             onClick={() => handleDeleteUser(u.user_id)} 
                             className="text-destructive focus:text-destructive focus:bg-destructive/10"
-                            disabled={u.isSuperAdmin && user?.user_id === u.user_id} // Prevent super admin from deleting self
+                            disabled={u.user_id === currentUser?.user_id || (u.is_super_admin && !currentUser?.is_super_admin)}
                           >
                             <Trash2 className="mr-2 h-4 w-4" /> Delete
                           </DropdownMenuItem>
@@ -300,7 +287,8 @@ export default function FullUserManagementPage() {
           </Table>
         </CardContent>
       </Card>
-        {filteredUsers.length > ITEMS_PER_PAGE && (
+      )}
+        {totalPages > 1 && (
         <div className="flex justify-center mt-4">
           <Button
             variant="outline"
@@ -310,12 +298,12 @@ export default function FullUserManagementPage() {
             Previous
           </Button>
           <span className="mx-4 self-center">
-            Page {currentPage} of {Math.ceil(filteredUsers.length / ITEMS_PER_PAGE)}
+            Page {currentPage} of {totalPages}
           </span>
           <Button
             variant="outline"
-            onClick={() => setCurrentPage(p => Math.min(Math.ceil(filteredUsers.length / ITEMS_PER_PAGE), p + 1))}
-            disabled={currentPage === Math.ceil(filteredUsers.length / ITEMS_PER_PAGE)}
+            onClick={() => setCurrentPage(p => Math.min(totalPages, p + 1))}
+            disabled={currentPage === totalPages}
           >
             Next
           </Button>
@@ -340,8 +328,8 @@ export default function FullUserManagementPage() {
               onCancel={() => { setIsEditUserDialogOpen(false); setEditingUser(null); }}
               availableRoles={availableRoles}
               isSubmitting={isSubmitting}
-              currentUserRole={user?.role}
-              isCurrentUserSuperAdmin={user?.isSuperAdmin}
+              currentUserRole={currentUser?.role}
+              isCurrentUserSuperAdmin={currentUser?.is_super_admin}
             />
           </DialogContent>
         </Dialog>

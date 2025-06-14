@@ -1,5 +1,4 @@
 // src/app/(main)/admin/settings/page.tsx
-
 'use client';
 
 import PageHeader from '@/components/shared/PageHeader';
@@ -14,12 +13,12 @@ export default function AdminSettingsPage() {
   const router = useRouter();
 
   useEffect(() => {
-    if (user && !user.isSuperAdmin) {
+    if (user && !user.is_super_admin) {
       router.replace('/dashboard');
     }
   }, [user, router]);
 
-  if (!user || !user.isSuperAdmin) {
+  if (!user || !user.is_super_admin) {
     return (
       <div className="flex flex-col items-center justify-center min-h-[calc(100vh-10rem)] text-center">
         <ShieldAlert className="w-16 h-16 text-destructive mb-4" />
@@ -33,7 +32,7 @@ export default function AdminSettingsPage() {
     <div className="space-y-6">
       <PageHeader 
         title="Admin Settings" 
-        description="Configure system-wide settings and parameters (Admin)."
+        description="Configure system-wide settings and parameters."
         icon={Settings}
       />
       <Card>
@@ -42,6 +41,7 @@ export default function AdminSettingsPage() {
         </CardHeader>
         <CardContent>
           <p className="text-muted-foreground">Admin settings and system configuration options will be implemented here.</p>
+          {/* Example: Add a form for site name, maintenance mode, etc. */}
         </CardContent>
       </Card>
     </div>

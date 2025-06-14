@@ -1,15 +1,14 @@
 // src/app/(main)/teacher/announcements/page.tsx
-
 'use client';
 
 import PageHeader from '@/components/shared/PageHeader';
 import AnnouncementGeneratorForm from '@/components/announcements/AnnouncementGeneratorForm';
 import { useAuthStore } from '@/store/authStore';
 import { useRouter } from 'next/navigation';
-import { useEffect, useState, useMemo } from 'react';
+import { useEffect, useState, startTransition } from 'react';
 import { Speaker, ShieldAlert, Loader2 } from 'lucide-react';
-import type { TeacherSectionInfo, UserProfile } from '@/types';
-import { mockScheduledCourses, mockCourses, mockSemesters } from '@/lib/data';
+import type { TeacherSectionInfo } from '@/types';
+import { getTeacherSections } from '@/actions/teacherActions'; // Server action
 
 export default function TeacherPostAnnouncementPage() {
   const { user } = useAuthStore();
@@ -20,20 +19,19 @@ export default function TeacherPostAnnouncementPage() {
   useEffect(() => {
     if (user && user.role !== 'Teacher') {
       router.replace('/dashboard');
-    } else if (user && user.role === 'Teacher') {
-      const currentUser = user as UserProfile;
-      const sections = mockScheduledCourses
-        .filter(sc => sc.teacher_id === currentUser.user_id)
-        .map(sc => {
-          const course = mockCourses.find(c => c.course_id === sc.course_id);
-          const semester = mockSemesters.find(s => s.semester_id === sc.semester_id);
-          return {
-            id: String(sc.scheduled_course_id),
-            name: `${course?.course_code || 'N/A'} - ${sc.section_number} (${semester?.name || 'N/A Semester'})`,
-          };
-        });
-      setTeacherSections(sections);
-      setIsLoadingSections(false);
+    } else if (user?.role === 'Teacher') {
+      const fetchSections = async () => {
+        setIsLoadingSections(true);
+        try {
+          const sections = await getTeacherSections(user.user_id);
+          setTeacherSections(sections);
+        } catch (error) {
+          console.error("Failed to load teacher sections:", error);
+        } finally {
+          setIsLoadingSections(false);
+        }
+      };
+      startTransition(() => { fetchSections(); });
     }
   }, [user, router]);
 
@@ -42,16 +40,15 @@ export default function TeacherPostAnnouncementPage() {
       <div className="flex flex-col items-center justify-center min-h-[calc(100vh-10rem)] text-center">
         <ShieldAlert className="w-16 h-16 text-destructive mb-4" />
         <h2 className="text-2xl font-bold mb-2">Access Denied</h2>
-        <p className="text-muted-foreground">You do not have permission to access this page.</p>
       </div>
     );
   }
 
   if (isLoadingSections) {
      return (
-      <div className="flex flex-col items-center justify-center min-h-[calc(100vh-10rem)] text-center">
-        <Loader2 className="w-16 h-16 animate-spin text-primary mb-4" />
-        <h2 className="text-2xl font-bold mb-2">Loading your sections...</h2>
+      <div className="flex justify-center items-center min-h-[calc(100vh-10rem)]">
+        <Loader2 className="w-8 h-8 animate-spin text-primary mb-4" />
+        <span className="ml-2">Loading your sections...</span>
       </div>
     );
   }
@@ -63,7 +60,11 @@ export default function TeacherPostAnnouncementPage() {
         description="Share important information with students in your selected sections."
         icon={Speaker}
       />
-      <AnnouncementGeneratorForm userRole="Teacher" availableSections={teacherSections} />
+      <AnnouncementGeneratorForm 
+        userRole="Teacher" 
+        authorId={user.user_id} 
+        availableSections={teacherSections} 
+      />
     </div>
   );
 }
