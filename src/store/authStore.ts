@@ -19,6 +19,7 @@ export const useAuthStore = create<AuthState>((set, get) => ({
   login: async (username: string, passwordAttempt: string) => {
     set({ isLoading: true });
     try {
+      // Call the actual server action for login which uses bcrypt
       const userProfile = await loginUser(username, passwordAttempt);
       set({ user: userProfile, isAuthenticated: true, isLoading: false });
     } catch (error) {
@@ -28,6 +29,7 @@ export const useAuthStore = create<AuthState>((set, get) => ({
   },
   logout: () => {
     set({ user: null, isAuthenticated: false, isLoading: false });
+    // Optionally: clear any other persisted state if needed, e.g., localStorage.
   },
   setUser: (user) => {
      set({ user, isAuthenticated: !!user, isLoading: false });
