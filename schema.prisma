@@ -1,0 +1,344 @@
+// schema.prisma
+
+datasource db {
+  provider = "mysql"
+  url      = env("DATABASE_URL")
+}
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+enum UserRole {
+  Student
+  Teacher
+  Staff
+}
+
+model User {
+  user_id               Int                 @id @default(autoincrement())
+  username              String              @unique
+  password_hash         String
+  email                 String              @unique
+  role                  UserRole
+  is_active             Boolean             @default(true)
+  is_super_admin        Boolean?            @default(false)
+  profile_picture_url   String?
+  created_at            DateTime            @default(now())
+  updated_at            DateTime            @updatedAt
+  student_profile       Student? // One-to-one with Student profile
+  teacher_profile       Teacher? // One-to-one with Teacher profile
+  staff_profile         Staff?   // One-to-one with Staff profile
+  authored_announcements Announcement[]      @relation("AnnouncementAuthor")
+  uploaded_materials    CourseMaterial[]    @relation("MaterialUploader")
+  audit_logs            AuditLog[]
+  student_enrollments   Registration[]      @relation("UserStudentEnrollments") // Student's registrations
+  courses_taught        ScheduledCourse[]   @relation("UserCoursesTaught") // Teacher's scheduled courses
+}
+
+model Department {
+  department_id Int          @id @default(autoincrement())
+  name          String       @unique
+  description   String?      @db.Text
+  created_at    DateTime     @default(now())
+  updated_at    DateTime     @updatedAt
+  students      Student[] // Students in this department
+  teachers      Teacher[] // Teachers in this department
+  courses       Course[] // Courses offered by this department
+  announcements Announcement[] @relation("DepartmentAnnouncements")
+}
+
+// Student profile, extends User
+model Student {
+  student_id      Int      @id // This IS the user_id
+  user            User     @relation(fields: [student_id], references: [user_id], onDelete: Cascade)
+  first_name      String
+  last_name       String
+  date_of_birth   DateTime? @db.Date
+  address         String?  @db.Text
+  phone_number    String?
+  department_id   Int?
+  department      Department? @relation(fields: [department_id], references: [department_id])
+  enrollment_date DateTime @db.Date
+  updated_at      DateTime @updatedAt
+}
+
+// Teacher profile, extends User
+model Teacher {
+  teacher_id      Int      @id // This IS the user_id
+  user            User     @relation(fields: [teacher_id], references: [user_id], onDelete: Cascade)
+  first_name      String
+  last_name       String
+  department_id   Int
+  department      Department @relation(fields: [department_id], references: [department_id])
+  office_location String?
+  phone_number    String?
+  updated_at      DateTime @updatedAt
+}
+
+// Staff profile, extends User
+model Staff {
+  staff_id   Int     @id // This IS the user_id
+  user       User    @relation(fields: [staff_id], references: [user_id], onDelete: Cascade)
+  first_name String
+  last_name  String
+  job_title  String?
+  phone_number String?
+  updated_at DateTime @updatedAt
+}
+
+model Course {
+  course_id           Int                 @id @default(autoincrement())
+  course_code         String              @unique
+  title               String
+  description         String?             @db.Text
+  credits             Int
+  department_id       Int
+  department          Department          @relation(fields: [department_id], references: [department_id])
+  created_at          DateTime            @default(now())
+  updated_at          DateTime            @updatedAt
+  scheduled_courses   ScheduledCourse[]
+  prerequisites       Prerequisite[]      @relation("CoursePrerequisites")
+  prerequisite_for    Prerequisite[]      @relation("PrerequisiteForCourse")
+}
+
+model Prerequisite {
+  prerequisite_id       Int    @id @default(autoincrement())
+  course_id             Int // The course that HAS prerequisites
+  prerequisite_course_id Int // The course that IS a prerequisite
+
+  course              Course @relation("CoursePrerequisites", fields: [course_id], references: [course_id])
+  prerequisiteCourse  Course @relation("PrerequisiteForCourse", fields: [prerequisite_course_id], references: [course_id])
+
+  @@unique([course_id, prerequisite_course_id])
+  @@index([prerequisite_course_id])
+}
+
+enum SemesterTerm {
+  Fall
+  Spring
+  Summer
+  Winter
+}
+
+model Semester {
+  semester_id             Int                 @id @default(autoincrement())
+  name                    String              @unique
+  academic_year           Int
+  term                    SemesterTerm
+  start_date              DateTime            @db.Date
+  end_date                DateTime            @db.Date
+  registration_start_date DateTime
+  registration_end_date   DateTime
+  add_drop_start_date     DateTime
+  add_drop_end_date       DateTime
+  created_at              DateTime            @default(now())
+  updated_at              DateTime            @updatedAt
+  scheduled_courses       ScheduledCourse[]
+  announcements           Announcement[]      @relation("SemesterAnnouncements")
+}
+
+model Building {
+  building_id Int      @id @default(autoincrement())
+  name        String   @unique
+  address     String?  @db.Text
+  created_at  DateTime @default(now())
+  updated_at  DateTime @updatedAt
+  rooms       Room[]
+}
+
+model Room {
+  room_id       Int               @id @default(autoincrement())
+  building_id   Int
+  building      Building          @relation(fields: [building_id], references: [building_id])
+  room_number   String
+  capacity      Int
+  type          String?
+  created_at    DateTime          @default(now())
+  updated_at    DateTime          @updatedAt
+  scheduled_courses ScheduledCourse[]
+
+  @@unique([building_id, room_number])
+}
+
+model ScheduledCourse {
+  scheduled_course_id   Int                 @id @default(autoincrement())
+  course_id             Int
+  course                Course              @relation(fields: [course_id], references: [course_id])
+  semester_id           Int
+  semester              Semester            @relation(fields: [semester_id], references: [semester_id])
+  teacher_id            Int
+  teacher               User                @relation("UserCoursesTaught", fields: [teacher_id], references: [user_id]) // Relation to User (Teacher)
+  room_id               Int?
+  room                  Room?               @relation(fields: [room_id], references: [room_id])
+  section_number        String
+  max_capacity          Int
+  current_enrollment    Int                 @default(0)
+  days_of_week          String?
+  start_time            String? // Store as HH:MM or HH:MM:SS
+  end_time              String? // Store as HH:MM or HH:MM:SS
+  created_at            DateTime            @default(now())
+  updated_at            DateTime            @updatedAt
+  registrations         Registration[]
+  materials             CourseMaterial[]
+  assessments           Assessment[]
+  targetedByAnnouncements AnnouncementTargetSection[] // Relation to join table
+
+  @@index([course_id])
+  @@index([semester_id])
+  @@index([teacher_id])
+  @@index([room_id])
+}
+
+enum RegistrationStatus {
+  Registered
+  Dropped
+  Completed
+  Waitlisted
+}
+
+model Registration {
+  registration_id     Int                  @id @default(autoincrement())
+  student_id          Int
+  student             User                 @relation("UserStudentEnrollments", fields: [student_id], references: [user_id]) // Relation to User (Student)
+  scheduled_course_id Int
+  scheduled_course    ScheduledCourse      @relation(fields: [scheduled_course_id], references: [scheduled_course_id])
+  registration_date   DateTime             @default(now())
+  status              RegistrationStatus
+  final_grade         String? // e.g., A, B+, C
+  grade_points        Float?  // e.g., 4.0, 3.3, 2.0
+  overall_percentage  Float?
+  final_letter_grade  String?
+  updated_at          DateTime             @updatedAt
+  assessment_scores   StudentAssessmentScore[]
+
+
+  @@unique([student_id, scheduled_course_id]) // A student can only register once for a specific scheduled course
+  @@index([scheduled_course_id])
+}
+
+enum MaterialType {
+  File
+  Link
+}
+
+model CourseMaterial {
+  material_id         Int             @id @default(autoincrement())
+  scheduled_course_id Int
+  scheduled_course    ScheduledCourse @relation(fields: [scheduled_course_id], references: [scheduled_course_id])
+  title               String
+  description         String?         @db.Text
+  material_type       MaterialType
+  file_path           String?         // For 'File' type
+  url                 String?         @db.Text // For 'Link' type
+  uploaded_by         Int             // User ID of the uploader
+  uploader            User            @relation("MaterialUploader", fields: [uploaded_by], references: [user_id])
+  upload_timestamp    DateTime        @default(now())
+
+  @@index([scheduled_course_id])
+  @@index([uploaded_by])
+}
+
+enum AnnouncementStatus {
+  Draft
+  Scheduled
+  Published
+  Archived
+}
+
+enum AnnouncementTone {
+  Formal
+  Urgent
+  Friendly
+  Informative
+  Academic
+}
+
+enum AnnouncementTargetAudience {
+  Students
+  Teachers
+  Staff
+  AllUsers
+}
+
+model Announcement {
+  announcement_id    Int                        @id @default(autoincrement())
+  title              String
+  content            String                     @db.Text
+  author_id          Int                        // User ID of the author
+  author             User                       @relation("AnnouncementAuthor", fields: [author_id], references: [user_id])
+  target_audience    AnnouncementTargetAudience
+  desired_tone       AnnouncementTone?
+  status             AnnouncementStatus         @default(Draft)
+  publish_date       DateTime?
+  expiry_date        DateTime?
+  department_id      Int?
+  department         Department?                @relation("DepartmentAnnouncements", fields: [department_id], references: [department_id])
+  semester_id        Int?
+  semester           Semester?                  @relation("SemesterAnnouncements", fields: [semester_id], references: [semester_id])
+  targetSections     AnnouncementTargetSection[] // Relation to join table
+  created_at         DateTime                   @default(now())
+  updated_at         DateTime                   @updatedAt
+
+  @@index([author_id])
+  @@index([department_id])
+  @@index([semester_id])
+}
+
+model AnnouncementTargetSection {
+  announcement_id     Int
+  scheduled_course_id Int
+  announcement        Announcement    @relation(fields: [announcement_id], references: [announcement_id], onDelete: Cascade)
+  scheduledCourse     ScheduledCourse @relation(fields: [scheduled_course_id], references: [scheduled_course_id], onDelete: Cascade)
+
+  @@id([announcement_id, scheduled_course_id])
+  @@index([scheduled_course_id])
+}
+
+
+model AuditLog {
+  log_id             Int      @id @default(autoincrement())
+  user_id            Int?
+  user               User?    @relation(fields: [user_id], references: [user_id])
+  action_type        String
+  target_entity_type String?
+  target_entity_id   String? // Can be string if IDs are not always numbers (e.g. course_code)
+  timestamp          DateTime @default(now())
+  ip_address         String?
+  details            String?  @db.Text
+
+  @@index([user_id])
+  @@index([action_type])
+  @@index([target_entity_type, target_entity_id])
+}
+
+
+model Assessment {
+  assessment_id       Int             @id @default(autoincrement())
+  scheduled_course_id Int
+  scheduled_course    ScheduledCourse @relation(fields: [scheduled_course_id], references: [scheduled_course_id])
+  name                String
+  max_score           Float
+  assessment_type     String?
+  created_at          DateTime        @default(now())
+  updated_at          DateTime        @updatedAt
+  student_scores      StudentAssessmentScore[]
+
+  @@index([scheduled_course_id])
+}
+
+model StudentAssessmentScore {
+  student_assessment_score_id Int          @id @default(autoincrement())
+  registration_id             Int
+  registration                Registration @relation(fields: [registration_id], references: [registration_id])
+  assessment_id               Int
+  assessment                  Assessment   @relation(fields: [assessment_id], references: [assessment_id])
+  score_achieved              Float?
+  graded_timestamp            DateTime?    @default(now())
+  feedback                    String?      @db.Text
+
+  @@unique([registration_id, assessment_id])
+  @@index([assessment_id])
+}
+
+    
