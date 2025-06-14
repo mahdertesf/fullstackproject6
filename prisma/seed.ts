@@ -76,15 +76,23 @@ async function main() {
     { name: 'Biomedical Engineering', description: 'Department of Biomedical Engineering' },
   ];
 
+  const createdDepartments = [];
   for (const deptData of departmentsToCreate) {
     const department = await prisma.department.upsert({
       where: { name: deptData.name },
       update: {},
       create: deptData,
     });
+    createdDepartments.push(department);
     console.log(`Created/Ensured department: ${department.name}`);
   }
   
+  const firstDepartmentId = createdDepartments.length > 0 ? createdDepartments[0].department_id : undefined;
+  if (!firstDepartmentId) {
+    console.warn("No departments were created or found. Skipping user creation that depends on departments.");
+  }
+
+
   // --- Create Semesters (Example) ---
   const currentYear = new Date().getFullYear();
   const semestersToCreate = [
@@ -103,40 +111,43 @@ async function main() {
 
 
   // --- Create example student, teacher, and staff users ---
-  const usersToCreate = [
-    { username: 'student1', email: 'student1@example.com', password_hash: 'studentPass123', role: UserRole.Student, first_name: 'Student', last_name: 'One', is_active: true, is_super_admin: false, department_id: 1 }, // Assuming Department ID 1 exists
-    { username: 'teacher1', email: 'teacher1@example.com', password_hash: 'teacherPass123', role: UserRole.Teacher, first_name: 'Teacher', last_name: 'One', is_active: true, is_super_admin: false, department_id: 1 }, // Assuming Department ID 1 exists
-    { username: 'staff1', email: 'staff1@example.com', password_hash: 'staffPass123', role: UserRole.Staff, first_name: 'Staff', last_name: 'One', is_active: true, is_super_admin: false },
-  ];
+  // Ensure department_id is valid; for this example, we'll use the ID of the first department created.
+  if (firstDepartmentId) {
+    const usersToCreate = [
+      { username: 'student1', email: 'student1@example.com', password_hash: 'studentPass123', role: UserRole.Student, first_name: 'Student', last_name: 'One', is_active: true, is_super_admin: false, department_id: firstDepartmentId },
+      { username: 'teacher1', email: 'teacher1@example.com', password_hash: 'teacherPass123', role: UserRole.Teacher, first_name: 'Teacher', last_name: 'One', is_active: true, is_super_admin: false, department_id: firstDepartmentId },
+      { username: 'staff1', email: 'staff1@example.com', password_hash: 'staffPass123', role: UserRole.Staff, first_name: 'Staff', last_name: 'One', is_active: true, is_super_admin: false },
+    ];
 
-  for (const userData of usersToCreate) {
-    let user = await prisma.user.findUnique({ where: { username: userData.username } });
-    if (!user) {
-      const profileData: any = {};
-      if (userData.role === UserRole.Student) {
-        profileData.student_profile = { create: { enrollment_date: new Date(), department_id: userData.department_id } };
-      } else if (userData.role === UserRole.Teacher) {
-        profileData.teacher_profile = { create: { department_id: userData.department_id } };
-      } else if (userData.role === UserRole.Staff) {
-        profileData.staff_profile = { create: { job_title: 'General Staff' } };
+    for (const userData of usersToCreate) {
+      let user = await prisma.user.findUnique({ where: { username: userData.username } });
+      if (!user) {
+        const profileData: any = {};
+        if (userData.role === UserRole.Student) {
+          profileData.student_profile = { create: { enrollment_date: new Date(), department_id: userData.department_id } };
+        } else if (userData.role === UserRole.Teacher) {
+          profileData.teacher_profile = { create: { department_id: userData.department_id } };
+        } else if (userData.role === UserRole.Staff) {
+          profileData.staff_profile = { create: { job_title: 'General Staff' } };
+        }
+
+        user = await prisma.user.create({
+          data: {
+            username: userData.username,
+            email: userData.email,
+            password_hash: userData.password_hash, // HASH IN PRODUCTION!
+            role: userData.role,
+            first_name: userData.first_name,
+            last_name: userData.last_name,
+            is_active: userData.is_active,
+            is_super_admin: userData.is_super_admin,
+            ...profileData,
+          },
+        });
+        console.log(`Created user: ${user.username}`);
+      } else {
+        console.log(`User "${userData.username}" already exists.`);
       }
-
-      user = await prisma.user.create({
-        data: {
-          username: userData.username,
-          email: userData.email,
-          password_hash: userData.password_hash, // HASH IN PRODUCTION!
-          role: userData.role,
-          first_name: userData.first_name,
-          last_name: userData.last_name,
-          is_active: userData.is_active,
-          is_super_admin: userData.is_super_admin,
-          ...profileData,
-        },
-      });
-      console.log(`Created user: ${user.username}`);
-    } else {
-      console.log(`User "${userData.username}" already exists.`);
     }
   }
 
