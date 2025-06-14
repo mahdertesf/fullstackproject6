@@ -1,4 +1,6 @@
+
 // schema.prisma
+
 datasource db {
   provider = "mysql"
   url      = env("DATABASE_URL")
@@ -8,11 +10,149 @@ generator client {
   provider = "prisma-client-js"
 }
 
-// --- Enums ---
+model User {
+  user_id         Int      @id @default(autoincrement())
+  username        String   @unique
+  password_hash   String
+  email           String   @unique
+  role            UserRole
+  first_name      String?
+  last_name       String?
+  phone_number    String?
+  address         String?
+  profile_picture_url String?
+  is_active       Boolean  @default(true)
+  is_super_admin  Boolean  @default(false)
+  created_at      DateTime @default(now())
+  updated_at      DateTime @updatedAt
+
+  student_profile Student? @relation("UserStudentProfile")
+  teacher_profile Teacher? @relation("UserTeacherProfile")
+  staff_profile   Staff?   @relation("UserStaffProfile")
+
+  student_enrollments Registration[]       @relation("UserStudentEnrollments")
+  courses_taught      ScheduledCourse[]    @relation("UserCoursesTaught")
+  authored_announcements Announcement[]  @relation("UserAuthoredAnnouncements")
+  uploaded_materials  CourseMaterial[]     @relation("UserUploadedMaterials")
+  audit_logs          AuditLog[]           @relation("UserAuditLogs")
+
+  department_id Int?
+  department    Department? @relation("UserDepartment", fields: [department_id], references: [department_id])
+
+  headed_department Department? @relation("DepartmentHeadUser")
+
+  @@index([role])
+}
+
 enum UserRole {
   Student
   Teacher
   Staff
+}
+
+model Department {
+  department_id Int      @id @default(autoincrement())
+  name          String   @unique
+  description   String?  @db.Text
+  created_at    DateTime @default(now())
+  updated_at    DateTime @updatedAt
+
+  courses           Course[]
+  students          Student[]          @relation("StudentDepartment")
+  teachers          Teacher[]          @relation("TeacherDepartment")
+  users             User[]             @relation("UserDepartment")
+  department_head_id Int?            @unique 
+  department_head    User?             @relation("DepartmentHeadUser", fields: [department_head_id], references: [user_id], onDelete: SetNull, onUpdate: Cascade)
+
+  announcements     Announcement[]     @relation("DepartmentAnnouncements")
+
+  @@index([name])
+}
+
+model Course {
+  course_id   Int     @id @default(autoincrement())
+  course_code String  @unique
+  title       String
+  description String? @db.Text
+  credits     Int
+  created_at  DateTime @default(now())
+  updated_at  DateTime @updatedAt
+
+  department_id Int
+  department    Department @relation(fields: [department_id], references: [department_id])
+
+  prerequisitesRequired Prerequisite[] @relation("CoursePrerequisites")
+  prerequisiteFor       Prerequisite[] @relation("PrerequisiteCourse")
+
+  scheduledCourses ScheduledCourse[]
+
+  @@index([course_code])
+  @@index([title])
+}
+
+model Prerequisite {
+  prerequisite_id      Int @id @default(autoincrement())
+  course_id            Int
+  prerequisite_course_id Int
+
+  course             Course @relation("CoursePrerequisites", fields: [course_id], references: [course_id])
+  prerequisiteCourse Course @relation("PrerequisiteCourse", fields: [prerequisite_course_id], references: [course_id])
+
+  @@unique([course_id, prerequisite_course_id])
+  @@index([prerequisite_course_id])
+}
+
+model Student {
+  student_id      Int      @id 
+  user            User     @relation("UserStudentProfile", fields: [student_id], references: [user_id])
+  enrollment_date DateTime
+  updated_at      DateTime @updatedAt
+
+  department_id   Int
+  department      Department @relation("StudentDepartment", fields: [department_id], references: [department_id])
+  
+  @@map("students")
+}
+
+model Teacher {
+  teacher_id      Int     @id
+  user            User    @relation("UserTeacherProfile", fields: [teacher_id], references: [user_id])
+  office_location String?
+  updated_at      DateTime @updatedAt
+
+  department_id   Int
+  department      Department @relation("TeacherDepartment", fields: [department_id], references: [department_id])
+
+  @@map("teachers")
+}
+
+model Staff {
+  staff_id   Int     @id
+  user       User    @relation("UserStaffProfile", fields: [staff_id], references: [user_id])
+  job_title  String?
+  updated_at DateTime @updatedAt
+  
+  @@map("staffs")
+}
+
+model Semester {
+  semester_id             Int      @id @default(autoincrement())
+  name                    String
+  academic_year           Int
+  term                    SemesterTerm
+  start_date              DateTime @db.Date
+  end_date                DateTime @db.Date
+  registration_start_date DateTime
+  registration_end_date   DateTime
+  add_drop_start_date     DateTime
+  add_drop_end_date       DateTime
+  created_at              DateTime @default(now())
+  updated_at              DateTime @updatedAt
+
+  scheduledCourses ScheduledCourse[]
+  announcements    Announcement[]    @relation("SemesterAnnouncements")
+
+  @@index([academic_year, term])
 }
 
 enum SemesterTerm {
@@ -22,349 +162,201 @@ enum SemesterTerm {
   Winter
 }
 
-enum RegistrationStatus {
-  Registered
-  Completed
-  Dropped
-  Waitlisted
-}
-
-enum MaterialType {
-  File
-  Link
-  Video
-  Text
-}
-
-enum AnnouncementStatus {
-  Draft
-  Published
-  Archived
-}
-
-enum AnnouncementTargetAudience {
-  AllUsers
-  Students
-  Teachers
-  Staff
-  // SpecificCourse (handled via join table)
-}
-
-// --- Models ---
-model User {
-  user_id           Int      @id @default(autoincrement())
-  username          String   @unique
-  password_hash     String
-  email             String   @unique
-  role              UserRole
-  first_name        String?
-  last_name         String?
-  date_of_birth     DateTime?
-  phone_number      String?
-  address           String?
-  profile_picture_url String?
-  is_active         Boolean  @default(true)
-  is_super_admin    Boolean  @default(false) // For Staff role to have admin privileges
-  last_login        DateTime?
-  created_at        DateTime @default(now())
-  updated_at        DateTime @updatedAt
-
-  student_profile   Student? // One-to-one with Student profile
-  teacher_profile   Teacher? // One-to-one with Teacher profile
-  staff_profile     Staff?   // One-to-one with Staff profile
-  
-  // Relations for User acting as Student
-  student_enrollments Registration[] @relation("UserStudentEnrollments")
-
-  // Relations for User acting as Teacher
-  courses_taught      ScheduledCourse[] @relation("UserCoursesTaught")
-  uploaded_materials  CourseMaterial[]  @relation("TeacherMaterials") // Materials uploaded by this teacher
-
-  // Relations for User acting as Author/Actor
-  authored_announcements Announcement[] @relation("AuthorAnnouncements")
-  audit_logs             AuditLog[]     @relation("UserAuditLogs")
-
-
-  @@index([role])
-}
-
-model Student {
-  student_id      Int      @id // This will be the same as User.user_id
-  user            User     @relation(fields: [student_id], references: [user_id], onDelete: Cascade)
-  enrollment_date DateTime @default(now())
-  graduation_date DateTime?
-  department_id   Int?     // Optional for now, or set a default/make it required during creation
-  department      Department? @relation(fields: [department_id], references: [department_id])
-  
-  // Registrations are linked through User.student_enrollments
-  // StudentAssessmentScores are linked through Registration -> StudentAssessmentScore
-
-  @@index([department_id])
-}
-
-model Teacher {
-  teacher_id    Int     @id // This will be the same as User.user_id
-  user          User    @relation(fields: [teacher_id], references: [user_id], onDelete: Cascade)
-  office_location String?
-  hire_date     DateTime? @default(now())
-  department_id Int?    // Optional for now, or set a default/make it required during creation
-  department    Department? @relation(fields: [department_id], references: [department_id])
-
-  // ScheduledCourses are linked through User.courses_taught
-  // CourseMaterials are linked through User.uploaded_materials
-
-  @@index([department_id])
-}
-
-model Staff {
-  staff_id    Int     @id // This will be the same as User.user_id
-  user        User    @relation(fields: [staff_id], references: [user_id], onDelete: Cascade)
-  job_title   String?
-  hire_date   DateTime? @default(now())
-  // Other staff-specific fields
-}
-
-model Department {
-  department_id Int      @id @default(autoincrement())
-  name          String   @unique
-  description   String?  @db.Text
-  courses       Course[] @relation("DepartmentCourses")
-  students      Student[] // Students in this department
-  teachers      Teacher[] // Teachers in this department
-
-  created_at DateTime @default(now())
-  updated_at DateTime @updatedAt
-}
-
-model Course {
-  course_id     Int      @id @default(autoincrement())
-  course_code   String   @unique
-  title         String
-  description   String?  @db.Text
-  credits       Int
-  department_id Int?
-  department    Department? @relation("DepartmentCourses", fields: [department_id], references: [department_id])
-  
-  prerequisitesRequired Prerequisite[] @relation("CoursePrerequisites") // Courses that THIS course requires
-  prerequisiteFor     Prerequisite[] @relation("PrerequisiteForCourse") // Courses for which THIS course is a prerequisite
-
-  scheduledCourses ScheduledCourse[] @relation("CourseScheduled") // Instances of this course being scheduled
-
-  created_at DateTime @default(now())
-  updated_at DateTime @updatedAt
-
-  @@index([department_id])
-}
-
-model Prerequisite {
-  prerequisite_id        Int    @id @default(autoincrement())
-  course_id              Int    // The course that has this prerequisite
-  course                 Course @relation("CoursePrerequisites", fields: [course_id], references: [course_id], onDelete: Cascade)
-  prerequisite_course_id Int    // The course that IS the prerequisite
-  prerequisiteCourse     Course @relation("PrerequisiteForCourse", fields: [prerequisite_course_id], references: [course_id], onDelete: Cascade)
-
-  @@unique([course_id, prerequisite_course_id])
-  @@index([prerequisite_course_id])
-}
-
-model Semester {
-  semester_id             Int      @id @default(autoincrement())
-  name                    String   @unique // e.g., "Fall 2023"
-  academic_year           Int      // e.g., 2023
-  term                    SemesterTerm // e.g., Fall, Spring
-  start_date              DateTime @db.Date
-  end_date                DateTime @db.Date
-  registration_start_date DateTime @db.Date
-  registration_end_date   DateTime @db.Date
-  add_drop_start_date     DateTime @db.Date
-  add_drop_end_date       DateTime @db.Date
-  
-  scheduledCourses ScheduledCourse[] @relation("SemesterScheduledCourses")
-  announcements    Announcement[]    @relation("SemesterAnnouncements")
-
-  created_at DateTime @default(now())
-  updated_at DateTime @updatedAt
-
-  @@index([start_date, end_date])
-}
-
 model Building {
-  building_id Int    @id @default(autoincrement())
-  name        String @unique
+  building_id Int      @id @default(autoincrement())
+  name        String   @unique
   address     String?
-  rooms       Room[] @relation("BuildingRooms")
+  created_at  DateTime @default(now())
+  updated_at  DateTime @updatedAt
 
-  created_at DateTime @default(now())
-  updated_at DateTime @updatedAt
+  rooms Room[]
 }
 
 model Room {
   room_id     Int      @id @default(autoincrement())
-  building_id Int
-  building    Building @relation("BuildingRooms", fields: [building_id], references: [building_id], onDelete: Cascade)
   room_number String
   capacity    Int
-  type        String?  // e.g., Lecture Hall, Lab
+  type        String?
+  created_at  DateTime @default(now())
+  updated_at  DateTime @updatedAt
 
-  scheduledCourses ScheduledCourse[] @relation("RoomScheduledCourses")
+  building_id Int
+  building    Building @relation(fields: [building_id], references: [building_id])
 
-  created_at DateTime @default(now())
-  updated_at DateTime @updatedAt
+  scheduledCourses ScheduledCourse[]
 
   @@unique([building_id, room_number])
 }
 
 model ScheduledCourse {
   scheduled_course_id Int      @id @default(autoincrement())
-  course_id           Int
-  course              Course   @relation("CourseScheduled", fields: [course_id], references: [course_id])
-  semester_id         Int
-  semester            Semester @relation("SemesterScheduledCourses", fields: [semester_id], references: [semester_id])
-  teacher_id          Int
-  teacher             User     @relation("UserCoursesTaught", fields: [teacher_id], references: [user_id]) // Relation to User (Teacher)
-  room_id             Int?
-  room                Room?    @relation("RoomScheduledCourses", fields: [room_id], references: [room_id])
   section_number      String
   max_capacity        Int
   current_enrollment  Int      @default(0)
-  days_of_week        String?  // e.g., "MWF", "TTH"
-  start_time          DateTime? @db.Time // Store as TIME type
-  end_time            DateTime? @db.Time // Store as TIME type
+  days_of_week        String?
+  start_time          DateTime? @db.Time
+  end_time            DateTime? @db.Time
+  created_at          DateTime @default(now())
+  updated_at          DateTime @updatedAt
+
+  course_id   Int
+  course      Course   @relation(fields: [course_id], references: [course_id])
+  semester_id Int
+  semester    Semester @relation(fields: [semester_id], references: [semester_id])
   
-  registrations Registration[] @relation("ScheduledCourseRegistrations")
-  materials     CourseMaterial[] @relation("ScheduledCourseMaterials")
-  assessments   Assessment[]     @relation("ScheduledCourseAssessments")
-  targetedByAnnouncements AnnouncementTargetSection[] @relation("ScheduledCourseTargetedByAnnouncement")
+  teacher_id  Int
+  teacher     User     @relation("UserCoursesTaught", fields: [teacher_id], references: [user_id])
+  
+  room_id     Int?
+  room        Room?    @relation(fields: [room_id], references: [room_id])
 
+  registrations Registration[]
+  materials     CourseMaterial[]
+  assessments   Assessment[]
+  targetedByAnnouncements AnnouncementTargetSection[] @relation("ScheduledCourseTargetedAnnouncements")
 
-  created_at DateTime @default(now())
-  updated_at DateTime @updatedAt
-
-  @@unique([course_id, semester_id, section_number], name: "unique_course_section_in_semester")
-  @@index([semester_id])
+  @@index([course_id, semester_id])
   @@index([teacher_id])
-  @@index([room_id])
 }
 
 model Registration {
-  registration_id     Int                @id @default(autoincrement())
+  registration_id     Int      @id @default(autoincrement())
+  registration_date   DateTime @default(now())
+  status              RegistrationStatus @default(Registered)
+  overall_percentage  Float?
+  final_letter_grade  String?
+  grade_points        Float?
+  updated_at          DateTime @updatedAt
+
   student_id          Int
-  student             User               @relation("UserStudentEnrollments", fields: [student_id], references: [user_id]) // Relation to User (Student)
+  student             User     @relation("UserStudentEnrollments", fields: [student_id], references: [user_id])
+  
   scheduled_course_id Int
-  scheduledCourse     ScheduledCourse    @relation("ScheduledCourseRegistrations", fields: [scheduled_course_id], references: [scheduled_course_id])
-  registration_date   DateTime           @default(now())
-  status              RegistrationStatus @default(Registered) // Registered, Completed, Dropped, Waitlisted
-  grade_points        Float?             // e.g., 3.7 for an A- in a 3 credit course would be 3.7 * 3 = 11.1 quality points. No, this is grade point value.
-  final_letter_grade  String?            // e.g., A, B+, C
-  overall_percentage  Float?             // Overall percentage score if applicable
+  scheduledCourse     ScheduledCourse @relation(fields: [scheduled_course_id], references: [scheduled_course_id])
 
-  assessment_scores StudentAssessmentScore[] @relation("RegistrationScores")
-
-  created_at DateTime @default(now())
-  updated_at DateTime @updatedAt
+  assessment_scores   StudentAssessmentScore[] @relation("RegistrationScores")
 
   @@unique([student_id, scheduled_course_id])
   @@index([scheduled_course_id])
 }
 
-model CourseMaterial {
-  material_id         Int          @id @default(autoincrement())
-  scheduled_course_id Int
-  scheduledCourse     ScheduledCourse @relation("ScheduledCourseMaterials", fields: [scheduled_course_id], references: [scheduled_course_id], onDelete: Cascade)
-  title               String
-  description         String?      @db.Text
-  material_type       MaterialType // File, Link, Video, Text
-  file_path           String?      // For File type
-  url                 String?      // For Link or Video type
-  content             String?      @db.Text // For Text type
-  uploaded_by_id      Int          // User ID of the teacher who uploaded
-  uploaded_by         User         @relation("TeacherMaterials", fields: [uploaded_by_id], references: [user_id])
-  upload_timestamp    DateTime     @default(now())
+enum RegistrationStatus {
+  Registered
+  Dropped
+  Completed
+  Waitlisted
+}
 
-  @@index([scheduled_course_id])
-  @@index([uploaded_by_id])
+model CourseMaterial {
+  material_id      Int      @id @default(autoincrement())
+  title            String
+  description      String?  @db.Text
+  material_type    MaterialType
+  file_path        String?
+  url              String?
+  upload_timestamp DateTime @default(now())
+
+  scheduled_course_id Int
+  scheduledCourse     ScheduledCourse @relation(fields: [scheduled_course_id], references: [scheduled_course_id])
+  
+  uploaded_by_id      Int
+  uploaded_by         User     @relation("UserUploadedMaterials", fields: [uploaded_by_id], references: [user_id])
+}
+
+enum MaterialType {
+  File
+  Link
 }
 
 model Assessment {
-  assessment_id       Int      @id @default(autoincrement())
+  assessment_id   Int      @id @default(autoincrement())
+  name            String
+  max_score       Int
+  assessment_type String?
+  created_at      DateTime @default(now())
+  updated_at      DateTime @updatedAt
+
   scheduled_course_id Int
-  scheduledCourse     ScheduledCourse @relation("ScheduledCourseAssessments", fields: [scheduled_course_id], references: [scheduled_course_id], onDelete: Cascade)
-  name                String
-  max_score           Int
-  assessment_type     String?  // e.g., Exam, Quiz, Homework, Project
-  due_date            DateTime?
+  scheduledCourse     ScheduledCourse @relation(fields: [scheduled_course_id], references: [scheduled_course_id])
 
-  student_scores StudentAssessmentScore[] @relation("AssessmentScores") // Scores given for this assessment
-
-  created_at DateTime @default(now())
-  updated_at DateTime @updatedAt
-
-  @@index([scheduled_course_id])
+  student_scores      StudentAssessmentScore[] @relation("AssessmentScores")
 }
 
 model StudentAssessmentScore {
-  score_id            Int        @id @default(autoincrement())
-  registration_id     Int
-  registration        Registration @relation("RegistrationScores", fields: [registration_id], references: [registration_id], onDelete: Cascade)
-  assessment_id       Int
-  assessment          Assessment @relation("AssessmentScores", fields: [assessment_id], references: [assessment_id], onDelete: Cascade)
-  score_achieved      Float?
-  graded_timestamp    DateTime?
-  comments            String?    @db.Text
+  student_assessment_score_id Int @id @default(autoincrement())
+  score_achieved              Float?
+  graded_timestamp            DateTime? @default(now())
+
+  registration_id Int
+  registration    Registration @relation("RegistrationScores", fields: [registration_id], references: [registration_id])
+
+  assessment_id   Int
+  assessment      Assessment   @relation("AssessmentScores", fields: [assessment_id], references: [assessment_id])
 
   @@unique([registration_id, assessment_id])
-  @@index([assessment_id])
 }
 
 model Announcement {
-  announcement_id    Int                        @id @default(autoincrement())
-  title              String
-  content            String                     @db.Text
-  author_id          Int                        // User ID of the staff/teacher who created it
-  author             User                       @relation("AuthorAnnouncements", fields: [author_id], references: [user_id])
-  publish_date       DateTime?
-  expiry_date        DateTime?
-  status             AnnouncementStatus         @default(Draft)
-  target_audience    AnnouncementTargetAudience @default(AllUsers)
-  desired_tone       String?                    // Added for AI generation consistency
-  semester_id        Int?                       // Optional: for semester-specific announcements
-  semester           Semester?                  @relation("SemesterAnnouncements", fields: [semester_id], references: [semester_id])
+  announcement_id Int      @id @default(autoincrement())
+  title           String
+  content         String   @db.Text
+  status          AnnouncementStatus @default(Draft)
+  publish_date    DateTime?
+  expiry_date     DateTime?
+  desired_tone    String?
+  target_audience AnnouncementTargetAudience @default(AllUsers)
+  created_at      DateTime @default(now())
+  updated_at      DateTime @updatedAt
+
+  author_id       Int
+  author          User     @relation("UserAuthoredAnnouncements", fields: [author_id], references: [user_id])
   
-  targetSections     AnnouncementTargetSection[] @relation("AnnouncementTargetedSections") // Link to specific course sections
+  department_id   Int?
+  department      Department? @relation("DepartmentAnnouncements", fields: [department_id], references: [department_id])
+  
+  semester_id     Int?
+  semester        Semester?  @relation("SemesterAnnouncements", fields: [semester_id], references: [semester_id])
 
-  created_at         DateTime                   @default(now())
-  updated_at         DateTime                   @updatedAt
-
-  @@index([author_id])
-  @@index([status, publish_date, expiry_date])
-  @@index([target_audience])
-  @@index([semester_id])
+  targetSections  AnnouncementTargetSection[] @relation("AnnouncementTargetedSections")
 }
 
-// Join table for Announcement and ScheduledCourse (Many-to-Many)
+enum AnnouncementStatus {
+  Draft
+  Scheduled
+  Published
+  Archived
+}
+
+enum AnnouncementTargetAudience {
+  Students
+  Teachers
+  Staff
+  AllUsers
+}
+
 model AnnouncementTargetSection {
-  announcement_id     Int
-  announcement        Announcement    @relation("AnnouncementTargetedSections", fields: [announcement_id], references: [announcement_id], onDelete: Cascade)
-  scheduled_course_id Int
-  scheduledCourse     ScheduledCourse @relation("ScheduledCourseTargetedByAnnouncement", fields: [scheduled_course_id], references: [scheduled_course_id], onDelete: Cascade)
+  announcement_id      Int
+  scheduled_course_id  Int
+
+  announcement         Announcement    @relation("AnnouncementTargetedSections", fields: [announcement_id], references: [announcement_id])
+  scheduledCourse      ScheduledCourse @relation("ScheduledCourseTargetedAnnouncements", fields: [scheduled_course_id], references: [scheduled_course_id])
 
   @@id([announcement_id, scheduled_course_id])
-  @@index([scheduled_course_id])
 }
 
 model AuditLog {
-  log_id             Int      @id @default(autoincrement())
-  user_id            Int?     // User who performed the action (null if system action)
-  user               User?    @relation("UserAuditLogs", fields: [user_id], references: [user_id], onDelete: SetNull)
-  action_type        String   // e.g., "USER_LOGIN", "COURSE_CREATE", "GRADE_UPDATE"
-  target_entity_type String?  // e.g., "User", "Course", "Registration"
-  target_entity_id   String?  // ID of the entity affected
-  details            String?  @db.Text // JSON string or textual details
-  timestamp          DateTime @default(now())
-  ip_address         String?
+  log_id              Int      @id @default(autoincrement())
+  timestamp           DateTime @default(now())
+  action_type         String
+  details             String?  @db.Text
+  ip_address          String?
+  target_entity_type  String?
+  target_entity_id    String?
 
-  @@index([user_id])
-  @@index([action_type])
-  @@index([target_entity_type, target_entity_id])
+  user_id             Int?
+  user                User?    @relation("UserAuditLogs", fields: [user_id], references: [user_id])
+
   @@index([timestamp])
+  @@index([action_type])
+  @@index([user_id])
 }
