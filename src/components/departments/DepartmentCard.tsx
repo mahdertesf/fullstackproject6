@@ -1,5 +1,5 @@
 // src/components/departments/DepartmentCard.tsx
-import type { Department } from '@/types';
+import type { Department } from '@prisma/client'; // Updated import
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Building2 } from 'lucide-react';
 
