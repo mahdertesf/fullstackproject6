@@ -1,12 +1,12 @@
 // src/components/courses/CourseCard.tsx
-import type { Course, Department } from '@/types';
+import type { Course as PrismaCourse, Department as PrismaDepartment } from '@prisma/client';
 import Link from 'next/link';
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { BookText, Tag, ArrowRight } from 'lucide-react';
 
 interface CourseCardProps {
-  course: Course & { department?: Department };
+  course: PrismaCourse & { department?: PrismaDepartment | null }; // Department can be null
 }
 
 export default function CourseCard({ course }: CourseCardProps) {

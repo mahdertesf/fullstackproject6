@@ -2,46 +2,65 @@
 
 'use client';
 
-import { useState, useMemo } from 'react';
+import { useState, useMemo, useEffect } from 'react';
 import PageHeader from '@/components/shared/PageHeader';
 import CourseCard from '@/components/courses/CourseCard';
-import { mockCourses, mockDepartments } from '@/lib/data';
-import type { Course, Department } from '@/types';
 import { Input } from '@/components/ui/input';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
-import { BookOpen, Search, Filter } from 'lucide-react';
+import { BookOpen, Search, Filter, Loader2 } from 'lucide-react';
 import { Pagination, PaginationContent, PaginationEllipsis, PaginationItem, PaginationLink, PaginationNext, PaginationPrevious } from "@/components/ui/pagination"
+import { getAllCoursesWithDetails, type CourseWithDepartment } from '@/actions/courseActions';
+import { getAllDepartments } from '@/actions/departmentActions';
+import type { Department as PrismaDepartment } from '@prisma/client';
 
 
 const ITEMS_PER_PAGE = 9;
 
 export default function CourseCatalogPage() {
   const [searchTerm, setSearchTerm] = useState('');
-  const [selectedDepartment, setSelectedDepartment] = useState<string>(''); // Empty string for initial placeholder state
+  const [selectedDepartmentId, setSelectedDepartmentId] = useState<string>(''); 
   const [currentPage, setCurrentPage] = useState(1);
+  const [isLoading, setIsLoading] = useState(true);
+  
+  const [allCourses, setAllCourses] = useState<CourseWithDepartment[]>([]);
+  const [allDepartments, setAllDepartments] = useState<PrismaDepartment[]>([]);
 
-  const coursesWithDepartments = useMemo(() => {
-    return mockCourses.map(course => ({
-      ...course,
-      department: mockDepartments.find(dept => dept.department_id === course.department_id),
-    }));
+  useEffect(() => {
+    async function fetchData() {
+      setIsLoading(true);
+      try {
+        const [coursesData, departmentsData] = await Promise.all([
+          getAllCoursesWithDetails(),
+          getAllDepartments()
+        ]);
+        setAllCourses(coursesData);
+        setAllDepartments(departmentsData);
+      } catch (error) {
+        console.error("Failed to fetch course catalog data:", error);
+        // Potentially set an error state here to show to the user
+      } finally {
+        setIsLoading(false);
+      }
+    }
+    fetchData();
   }, []);
 
+
   const filteredCourses = useMemo(() => {
-    return coursesWithDepartments.filter(course => {
+    return allCourses.filter(course => {
       const matchesSearchTerm = 
         course.title.toLowerCase().includes(searchTerm.toLowerCase()) ||
         course.course_code.toLowerCase().includes(searchTerm.toLowerCase()) ||
         (course.description && course.description.toLowerCase().includes(searchTerm.toLowerCase()));
       
-      const isFilteringBySpecificDepartment = selectedDepartment !== '' && selectedDepartment !== 'all';
+      const isFilteringBySpecificDepartment = selectedDepartmentId !== '' && selectedDepartmentId !== 'all';
       const matchesDepartment = isFilteringBySpecificDepartment
-        ? (course.department_id != null && course.department_id === parseInt(selectedDepartment))
-        : true; // If selectedDepartment is '' (initial/placeholder) or 'all', then all departments match.
+        ? (course.department_id != null && course.department_id === parseInt(selectedDepartmentId))
+        : true; 
       
       return matchesSearchTerm && matchesDepartment;
     });
-  }, [coursesWithDepartments, searchTerm, selectedDepartment]);
+  }, [allCourses, searchTerm, selectedDepartmentId]);
 
   const totalPages = Math.ceil(filteredCourses.length / ITEMS_PER_PAGE);
   const paginatedCourses = filteredCourses.slice(
@@ -54,6 +73,15 @@ export default function CourseCatalogPage() {
       setCurrentPage(page);
     }
   };
+
+  if (isLoading) {
+    return (
+      <div className="flex flex-col items-center justify-center min-h-[calc(100vh-10rem)]">
+        <Loader2 className="h-12 w-12 animate-spin text-primary" />
+        <p className="mt-4 text-lg">Loading Course Catalog...</p>
+      </div>
+    );
+  }
 
   return (
     <div className="space-y-6">
@@ -80,14 +108,14 @@ export default function CourseCatalogPage() {
         </div>
         <div>
           <label htmlFor="filter-department" className="block text-sm font-medium text-foreground mb-1">Filter by Department</label>
-          <Select value={selectedDepartment} onValueChange={(value) => { setSelectedDepartment(value); setCurrentPage(1); }}>
+          <Select value={selectedDepartmentId} onValueChange={(value) => { setSelectedDepartmentId(value); setCurrentPage(1); }}>
             <SelectTrigger id="filter-department" className="w-full">
                <Filter className="h-4 w-4 mr-2 text-muted-foreground" />
               <SelectValue placeholder="All Departments" />
             </SelectTrigger>
             <SelectContent>
               <SelectItem value="all">All Departments</SelectItem>
-              {mockDepartments.map((dept) => (
+              {allDepartments.map((dept) => (
                 <SelectItem key={dept.department_id} value={String(dept.department_id)}>
                   {dept.name}
                 </SelectItem>
@@ -123,7 +151,6 @@ export default function CourseCatalogPage() {
             </PaginationItem>
             {[...Array(totalPages)].map((_, i) => {
               const page = i + 1;
-              // Basic pagination logic, could be more sophisticated for many pages
               if (totalPages <= 5 || page === 1 || page === totalPages || Math.abs(page - currentPage) <= 1 || (currentPage <= 2 && page <=3) || (currentPage >= totalPages -1 && page >= totalPages -2 )) {
                 return (
                   <PaginationItem key={page}>
