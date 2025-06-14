@@ -42,7 +42,7 @@ export interface DetailedCourse extends PrismaCourse {
     prerequisiteCourse: PrismaCourse | null; 
   })[];
   scheduledCourses: (PrismaScheduledCourse & {
-    teacher: PrismaUser | null;
+    teacher: PrismaUser | null; // Teacher is a User
     semester: PrismaSemester | null;
     room: (PrismaRoom & {
       building: PrismaBuilding | null;
@@ -56,15 +56,15 @@ export async function getCourseByIdWithDetails(courseId: number): Promise<Detail
       where: { course_id: courseId },
       include: {
         department: true,
-        prerequisitesRequired: { 
+        prerequisitesRequired: { // These are prerequisites *for* this course
           include: {
-            prerequisiteCourse: true, 
+            prerequisiteCourse: true, // The actual course that is a prerequisite
           },
         },
-        scheduledCourses: { 
-          take: 3, 
+        scheduledCourses: { // Instances of this course being scheduled
+          take: 3, // Limit to a few recent/upcoming offerings
           include: {
-            teacher: true,
+            teacher: true, // User who is the teacher
             semester: true,
             room: {
               include: {
@@ -74,7 +74,7 @@ export async function getCourseByIdWithDetails(courseId: number): Promise<Detail
           },
           orderBy: {
             semester: {
-              start_date: 'desc', 
+              start_date: 'desc', // Show most recent semesters first for scheduled instances
             },
           },
         },
@@ -83,6 +83,7 @@ export async function getCourseByIdWithDetails(courseId: number): Promise<Detail
 
     if (!course) return null;
     
+    // Ensure the structure matches DetailedCourse, especially if Prisma's include is slightly different
     return course as DetailedCourse;
   } catch (error) {
     console.error(`Error fetching course ${courseId} with details:`, error);
