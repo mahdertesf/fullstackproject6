@@ -1,13 +1,13 @@
 // src/store/authStore.ts
 import { create } from 'zustand';
-import type { UserProfile, UserRole } from '@/types';
-import { mockUserProfiles } from '@/lib/data'; // For mock login
+import type { UserProfile } from '@/types';
+import { loginUser } from '@/actions/authActions'; // Import the server action
 
 interface AuthState {
   user: UserProfile | null;
   isAuthenticated: boolean;
   isLoading: boolean;
-  login: (username: string) /* For mock, just username */ => Promise<void>;
+  login: (username: string, passwordAttempt: string) => Promise<void>;
   logout: () => void;
   setUser: (user: UserProfile | null) => void;
 }
@@ -16,14 +16,14 @@ export const useAuthStore = create<AuthState>((set, get) => ({
   user: null,
   isAuthenticated: false,
   isLoading: true, // Initially true until auth status is checked
-  login: async (username: string) => {
-    // Mock login: find user by username
-    const foundUser = mockUserProfiles.find(u => u.username === username);
-    if (foundUser) {
-      set({ user: foundUser, isAuthenticated: true, isLoading: false });
-    } else {
+  login: async (username: string, passwordAttempt: string) => {
+    set({ isLoading: true });
+    try {
+      const userProfile = await loginUser(username, passwordAttempt);
+      set({ user: userProfile, isAuthenticated: true, isLoading: false });
+    } catch (error) {
       set({ user: null, isAuthenticated: false, isLoading: false });
-      throw new Error('Invalid credentials');
+      throw error; // Re-throw to be caught by the form
     }
   },
   logout: () => {
