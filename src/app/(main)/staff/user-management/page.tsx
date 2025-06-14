@@ -8,9 +8,9 @@ import { Input } from '@/components/ui/input';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from '@/components/ui/dropdown-menu';
-import { Card } from '@/components/ui/card';
+import { Card, CardHeader, CardContent } from '@/components/ui/card'; // Added CardHeader and CardContent
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog';
-import type { UserProfile as FullUserProfile, UserRole } from '@prisma/client';
+import type { UserProfile as FullUserProfile, UserRole, Department as PrismaDepartment } from '@prisma/client'; // Added PrismaDepartment
 import { Users, Edit, Trash2, PlusCircle, Search, Filter, MoreHorizontal, ShieldAlert, Loader2 } from 'lucide-react';
 import { useAuthStore } from '@/store/authStore';
 import { useRouter } from 'next/navigation';
@@ -20,6 +20,7 @@ import EditUserForm from '@/components/users/EditUserForm';
 import { NewUserFormData, EditUserFormData } from '@/lib/schemas';
 import { useToast } from '@/hooks/use-toast';
 import { getAllUsers, createUser, updateUser, deleteUser } from '@/actions/userActions';
+import { getAllDepartments } from '@/actions/departmentActions'; // To fetch departments for forms
 
 const ITEMS_PER_PAGE = 10;
 
@@ -37,15 +38,19 @@ export default function UserManagementPage() {
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [isLoadingData, setIsLoadingData] = useState(true);
   const [usersList, setUsersList] = useState<FullUserProfile[]>([]);
+  const [departments, setDepartments] = useState<PrismaDepartment[]>([]);
 
-  const fetchUsers = async () => {
+  const fetchPageData = async () => {
     setIsLoadingData(true);
     try {
-      // For Staff (non-superadmin), filter criteria in getAllUsers action will apply
-      const data = await getAllUsers({ searchTerm, role: selectedRole }, currentUser?.user_id, currentUser?.is_super_admin);
-      setUsersList(data);
+      const [usersData, departmentsData] = await Promise.all([
+        getAllUsers({ searchTerm, role: selectedRole }, currentUser?.user_id, currentUser?.is_super_admin),
+        getAllDepartments()
+      ]);
+      setUsersList(usersData);
+      setDepartments(departmentsData);
     } catch (error) {
-      toast({ variant: 'destructive', title: 'Error', description: 'Failed to load users.' });
+      toast({ variant: 'destructive', title: 'Error', description: 'Failed to load page data.' });
     } finally {
       setIsLoadingData(false);
     }
@@ -55,14 +60,14 @@ export default function UserManagementPage() {
     if (currentUser && currentUser.role !== 'Staff' && !currentUser.is_super_admin) {
       router.replace('/dashboard');
     } else if (currentUser) {
-        fetchUsers();
+        fetchPageData();
     }
   }, [currentUser, router]);
 
   useEffect(() => {
     if (currentUser) {
         const handler = setTimeout(() => {
-             startTransition(() => { fetchUsers(); });
+             startTransition(() => { fetchPageData(); }); // Fetch all data on filter change
         }, 300);
         return () => clearTimeout(handler);
     }
@@ -91,7 +96,7 @@ export default function UserManagementPage() {
       await updateUser(editingUser.user_id, data, currentUser.user_id);
       toast({ title: 'User Updated', description: `User ${data.username} has been updated.` });
       setIsEditUserDialogOpen(false); setEditingUser(null);
-      startTransition(fetchUsers);
+      startTransition(fetchPageData);
     } catch (error) { toast({ variant: 'destructive', title: 'Error', description: (error as Error).message || 'Failed to update user.'});
     } finally { setIsSubmitting(false); }
   };
@@ -104,7 +109,7 @@ export default function UserManagementPage() {
     try {
       await deleteUser(userId, currentUser.user_id);
       toast({ title: 'User Deleted', description: `User ${userToDelete.username} has been removed.` });
-      startTransition(fetchUsers);
+      startTransition(fetchPageData);
     } catch (error) { toast({ variant: 'destructive', title: 'Error', description: (error as Error).message || 'Failed to delete user.'});
     } finally { setIsSubmitting(false); }
   };
@@ -116,7 +121,7 @@ export default function UserManagementPage() {
       await createUser(data, currentUser.role, currentUser.is_super_admin);
       toast({ title: 'User Created', description: `User ${data.username} has been created.` });
       setIsAddUserDialogOpen(false);
-      startTransition(fetchUsers);
+      startTransition(fetchPageData);
     } catch (error) { toast({ variant: 'destructive', title: 'Error', description: (error as Error).message || 'Failed to create user.'});
     } finally { setIsSubmitting(false); }
   };
@@ -141,7 +146,7 @@ export default function UserManagementPage() {
               <DialogHeader><DialogTitle>Add New User</DialogTitle>
                 <DialogDescription>{currentUser.is_super_admin ? "Admins can create Staff roles." : "Staff can create Student or Teacher roles."}</DialogDescription>
               </DialogHeader>
-              <AddUserForm onSubmit={handleAddNewUser} onCancel={() => setIsAddUserDialogOpen(false)} availableRoles={availableRolesForNewUser} isSubmitting={isSubmitting} />
+              <AddUserForm onSubmit={handleAddNewUser} onCancel={() => setIsAddUserDialogOpen(false)} availableRoles={availableRolesForNewUser} isSubmitting={isSubmitting} departments={departments} />
             </DialogContent>
           </Dialog>
         }
@@ -149,7 +154,7 @@ export default function UserManagementPage() {
       <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-6 p-4 border rounded-lg shadow-sm bg-card">
         <div className="md:col-span-2">
           <label htmlFor="search-users" className="block text-sm font-medium text-foreground mb-1">Search</label>
-          <div className="relative"><Search className="absolute left-3 top-1/2 -translate-y-1/2 h-5 w-5 text-muted-foreground" /><Input id="search-users" type="text" placeholder="Search..." value={searchTerm} onChange={(e) => setSearchTerm(e.target.value)} className="pl-10"/></div>
+          <div className="relative"><Search className="absolute left-3 top-1/2 -translate-y-1/2 h-5 w-5 text-muted-foreground" /><Input id="search-users" type="text" placeholder="Search by name, username, email..." value={searchTerm} onChange={(e) => setSearchTerm(e.target.value)} className="pl-10"/></div>
         </div>
         <div>
           <label htmlFor="filter-role" className="block text-sm font-medium text-foreground mb-1">Filter by Role</label>
@@ -157,6 +162,7 @@ export default function UserManagementPage() {
             <SelectTrigger id="filter-role" className="w-full"><Filter className="h-4 w-4 mr-2 text-muted-foreground" /><SelectValue placeholder="All Roles" /></SelectTrigger>
             <SelectContent>
               <SelectItem value="all">All Roles</SelectItem><SelectItem value="Student">Student</SelectItem><SelectItem value="Teacher">Teacher</SelectItem>
+              {/* Staff role filter only available if current user is super admin */}
               {currentUser?.is_super_admin && <SelectItem value="Staff">Staff</SelectItem>}
             </SelectContent>
           </Select>
@@ -165,42 +171,58 @@ export default function UserManagementPage() {
 
       {isLoadingData ? <div className="flex justify-center items-center p-8"><Loader2 className="h-8 w-8 animate-spin" /></div> : (
       <Card>
-        <Table>
-          <TableHeader><TableRow><TableHead>Name</TableHead><TableHead>Username</TableHead><TableHead>Email</TableHead><TableHead>Role</TableHead><TableHead>Status</TableHead><TableHead className="text-right">Actions</TableHead></TableRow></TableHeader>
-          <TableBody>
-            {paginatedUsers.length > 0 ? (
-              paginatedUsers.map((u) => (
-                <TableRow key={u.user_id}>
-                  <TableCell><div className="font-medium">{u.first_name || ''} {u.last_name || ''}</div>{(!u.first_name && !u.last_name) && <span className="text-muted-foreground italic">N/A</span>}</TableCell>
-                  <TableCell>{u.username}</TableCell><TableCell>{u.email}</TableCell>
-                  <TableCell><Badge variant={u.role === 'Student' ? 'secondary' : u.role === 'Teacher' ? 'outline' : 'default'}>{u.is_super_admin ? 'Admin' : u.role}</Badge></TableCell>
-                  <TableCell><Badge variant={u.is_active ? 'default' : 'destructive'} className={u.is_active ? 'bg-green-500 hover:bg-green-600' : ''}>{u.is_active ? 'Active' : 'Inactive'}</Badge></TableCell>
-                  <TableCell className="text-right">
-                    <DropdownMenu>
-                      <DropdownMenuTrigger asChild>
-                        <Button variant="ghost" size="icon" disabled={(u.is_super_admin && (!currentUser?.is_super_admin || (currentUser?.is_super_admin && currentUser?.user_id !== u.user_id && u.user_id !== currentUser?.user_id))) || isSubmitting}><MoreHorizontal className="h-4 w-4" /></Button>
-                      </DropdownMenuTrigger>
-                      <DropdownMenuContent align="end">
-                        <DropdownMenuItem onClick={() => handleOpenEditDialog(u)} disabled={(currentUser?.role === 'Staff' && !currentUser?.is_super_admin && (u.role === 'Staff' || u.is_super_admin))}><Edit className="mr-2 h-4 w-4" /> Edit</DropdownMenuItem>
-                        <DropdownMenuItem onClick={() => handleDeleteUser(u.user_id)} className="text-destructive focus:text-destructive focus:bg-destructive/10" disabled={(currentUser?.role === 'Staff' && !currentUser?.is_super_admin && (u.role === 'Staff' || u.is_super_admin)) || (u.user_id === currentUser?.user_id)}><Trash2 className="mr-2 h-4 w-4" /> Delete</DropdownMenuItem>
-                      </DropdownMenuContent>
-                    </DropdownMenu>
-                  </TableCell>
-                </TableRow>
-              ))
-            ) : (<TableRow><TableCell colSpan={6} className="text-center h-24">No users found.</TableCell></TableRow>)}
-          </TableBody>
-        </Table>
+        <CardHeader><h3 className="text-lg font-semibold">User List ({usersList.length})</h3></CardHeader>
+        <CardContent>
+          <Table>
+            <TableHeader><TableRow><TableHead>Name</TableHead><TableHead>Username</TableHead><TableHead>Email</TableHead><TableHead>Role</TableHead><TableHead>Department</TableHead><TableHead>Status</TableHead><TableHead className="text-right">Actions</TableHead></TableRow></TableHeader>
+            <TableBody>
+              {paginatedUsers.length > 0 ? (
+                paginatedUsers.map((u) => (
+                  <TableRow key={u.user_id}>
+                    <TableCell><div className="font-medium">{u.first_name || ''} {u.last_name || ''}</div>{(!u.first_name && !u.last_name) && <span className="text-muted-foreground italic">N/A</span>}</TableCell>
+                    <TableCell>{u.username}</TableCell><TableCell>{u.email}</TableCell>
+                    <TableCell><Badge variant={u.role === 'Student' ? 'secondary' : u.role === 'Teacher' ? 'outline' : 'default'}>{u.is_super_admin ? 'Admin' : u.role}</Badge></TableCell>
+                    <TableCell>{u.student_profile?.department?.name || u.teacher_profile?.department?.name || 'N/A'}</TableCell>
+                    <TableCell><Badge variant={u.is_active ? 'default' : 'destructive'} className={u.is_active ? 'bg-green-500 hover:bg-green-600' : ''}>{u.is_active ? 'Active' : 'Inactive'}</Badge></TableCell>
+                    <TableCell className="text-right">
+                      <DropdownMenu>
+                        <DropdownMenuTrigger asChild>
+                          <Button variant="ghost" size="icon" 
+                            disabled={
+                              (u.is_super_admin && (!currentUser?.is_super_admin || (currentUser?.is_super_admin && currentUser?.user_id === u.user_id))) || // Non-superadmin cannot touch superadmin, superadmin cannot touch self
+                              (currentUser?.role === 'Staff' && !currentUser.is_super_admin && (u.role === 'Staff' || u.is_super_admin)) || // Staff cannot touch other staff or superadmins
+                              isSubmitting
+                            }
+                          ><MoreHorizontal className="h-4 w-4" /></Button>
+                        </DropdownMenuTrigger>
+                        <DropdownMenuContent align="end">
+                          <DropdownMenuItem onClick={() => handleOpenEditDialog(u)} disabled={(currentUser?.role === 'Staff' && !currentUser?.is_super_admin && (u.role === 'Staff' || u.is_super_admin))}><Edit className="mr-2 h-4 w-4" /> Edit</DropdownMenuItem>
+                          <DropdownMenuItem onClick={() => handleDeleteUser(u.user_id)} className="text-destructive focus:text-destructive focus:bg-destructive/10" 
+                            disabled={
+                              (u.user_id === currentUser?.user_id) || // Cannot delete self
+                              (currentUser?.role === 'Staff' && !currentUser?.is_super_admin && (u.role === 'Staff' || u.is_super_admin)) || // Staff cannot delete other staff or superadmins
+                              (u.is_super_admin && !currentUser?.is_super_admin) // Non-superadmin cannot delete superadmin
+                            }
+                          ><Trash2 className="mr-2 h-4 w-4" /> Delete</DropdownMenuItem>
+                        </DropdownMenuContent>
+                      </DropdownMenu>
+                    </TableCell>
+                  </TableRow>
+                ))
+              ) : (<TableRow><TableCell colSpan={7} className="text-center h-24">No users found matching your criteria.</TableCell></TableRow>)}
+            </TableBody>
+          </Table>
+        </CardContent>
       </Card>
       )}
       {totalPages > 1 && (
-        <div className="flex justify-center mt-4"><Button variant="outline" onClick={() => setCurrentPage(p => Math.max(1, p - 1))} disabled={currentPage === 1}>Previous</Button><span className="mx-4 self-center">Page {currentPage} of {totalPages}</span><Button variant="outline" onClick={() => setCurrentPage(p => Math.min(totalPages, p + 1))} disabled={currentPage === totalPages}>Next</Button></div>
+        <div className="flex justify-center mt-4 space-x-2"><Button variant="outline" onClick={() => setCurrentPage(p => Math.max(1, p - 1))} disabled={currentPage === 1}>Previous</Button><span className="mx-2 self-center">Page {currentPage} of {totalPages}</span><Button variant="outline" onClick={() => setCurrentPage(p => Math.min(totalPages, p + 1))} disabled={currentPage === totalPages}>Next</Button></div>
       )}
       {editingUser && (
         <Dialog open={isEditUserDialogOpen} onOpenChange={(isOpen) => { setIsEditUserDialogOpen(isOpen); if (!isOpen) setEditingUser(null); }}>
           <DialogContent className="sm:max-w-[600px]">
             <DialogHeader><DialogTitle>Edit User: {editingUser.username}</DialogTitle></DialogHeader>
-            <EditUserForm userToEdit={editingUser} onSubmit={handleEditUserSubmit} onCancel={() => { setIsEditUserDialogOpen(false); setEditingUser(null); }} availableRoles={availableRolesForEdit} isSubmitting={isSubmitting} currentUserRole={currentUser?.role} isCurrentUserSuperAdmin={currentUser?.is_super_admin}/>
+            <EditUserForm userToEdit={editingUser} onSubmit={handleEditUserSubmit} onCancel={() => { setIsEditUserDialogOpen(false); setEditingUser(null); }} availableRoles={availableRolesForEdit} isSubmitting={isSubmitting} currentUserRole={currentUser?.role} isCurrentUserSuperAdmin={currentUser?.is_super_admin} departments={departments}/>
           </DialogContent>
         </Dialog>
       )}

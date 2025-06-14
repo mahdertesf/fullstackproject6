@@ -11,7 +11,7 @@ export type LoginFormData = z.infer<typeof LoginSchema>;
 export const AnnouncementGeneratorSchema = z.object({
   topic: z.string().min(3, { message: "Topic must be at least 3 characters long." }),
   desiredTone: z.enum(['Formal', 'Urgent', 'Friendly', 'Informative', 'Academic']), 
-  targetAudience: z.enum(['Students', 'Teachers', 'Staff', 'All Users'], { required_error: "Target audience is required."}).optional(), // Optional for teachers
+  targetAudience: z.enum(['Students', 'Teachers', 'Staff', 'AllUsers'], { required_error: "Target audience is required."}).optional(), // Optional for teachers
   selectedSections: z.array(z.string()).optional(), // For teachers to select sections
 });
 export type AnnouncementGeneratorFormData = z.infer<typeof AnnouncementGeneratorSchema>;
@@ -30,6 +30,7 @@ export const UserProfileSchema = z.object({
   address: z.string().optional(),
   office_location: z.string().optional(), // For teachers
   job_title: z.string().optional(), // For staff
+  // department_id is not typically edited by the user directly on their profile page
 });
 export type UserProfileFormData = z.infer<typeof UserProfileSchema>;
 
@@ -39,11 +40,15 @@ export const NewUserSchema = z.object({
   firstName: z.string().optional(),
   lastName: z.string().optional(),
   role: z.enum(['Student', 'Teacher', 'Staff'], { required_error: "Role is required." }),
+  department_id: z.string().optional(), // Added for Student/Teacher creation
   password: z.string().min(6, "Password must be at least 6 characters."),
   confirmPassword: z.string().min(6, "Confirm password must be at least 6 characters."),
 }).refine(data => data.password === data.confirmPassword, {
   message: "Passwords don't match",
-  path: ["confirmPassword"], // Path to field to display error
+  path: ["confirmPassword"],
+}).refine(data => (data.role === 'Student' || data.role === 'Teacher') ? !!data.department_id : true, {
+  message: "Department is required for Students and Teachers.",
+  path: ["department_id"],
 });
 export type NewUserFormData = z.infer<typeof NewUserSchema>;
 
@@ -53,7 +58,11 @@ export const EditUserSchema = z.object({
   firstName: z.string().optional(),
   lastName: z.string().optional(),
   role: z.enum(['Student', 'Teacher', 'Staff'], { required_error: "Role is required." }),
+  department_id: z.string().optional(), // Added for Student/Teacher editing
   is_active: z.boolean().default(true),
+}).refine(data => (data.role === 'Student' || data.role === 'Teacher') ? !!data.department_id : true, {
+  message: "Department is required for Students and Teachers.",
+  path: ["department_id"],
 });
 export type EditUserFormData = z.infer<typeof EditUserSchema>;
 
@@ -78,7 +87,7 @@ export type EditCourseFormData = z.infer<typeof EditCourseSchema>;
 export const NewSemesterSchema = z.object({
   name: z.string().min(3, "Semester name must be at least 3 characters."),
   academic_year: z.coerce.number()
-    .min(new Date().getFullYear() - 5, `Year cannot be too far in the past.`)
+    .min(new Date().getFullYear() - 10, `Year cannot be too far in the past.`) // Extended range slightly
     .max(new Date().getFullYear() + 5, `Year cannot be too far in the future.`),
   term: z.enum(['Fall', 'Spring', 'Summer', 'Winter'], { required_error: "Term is required."}),
   start_date: z.date({ required_error: "Start date is required."}),
@@ -99,7 +108,7 @@ export const NewSemesterSchema = z.object({
 }).refine(data => data.registration_start_date <= data.start_date, {
   message: "Registration start date must be on or before the semester start date.",
   path: ["registration_start_date"],
-}).refine(data => data.add_drop_start_date >= data.start_date, {
+}).refine(data => data.add_drop_start_date >= data.start_date, { // Corrected condition
   message: "Add/Drop period must start on or after the semester start date.",
   path: ["add_drop_start_date"],
 });

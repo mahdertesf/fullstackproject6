@@ -11,8 +11,8 @@ export default {
   theme: {
     extend: {
       fontFamily: {
-        body: ['Inter', 'sans-serif'],
-        headline: ['Space Grotesk', 'sans-serif'],
+        body: ['var(--font-inter)', 'sans-serif'], // Use CSS variable
+        headline: ['var(--font-space-grotesk)', 'sans-serif'], // Use CSS variable
         code: ['monospace'],
       },
       colors: {

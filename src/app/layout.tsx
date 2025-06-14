@@ -1,8 +1,22 @@
 // src/app/layout.tsx
 import type { Metadata } from 'next';
+import { Inter, Space_Grotesk } from 'next/font/google'; // Import from next/font
 import './globals.css';
 import { Toaster } from "@/components/ui/toaster";
 import Providers from '@/components/Providers';
+
+// Configure fonts using next/font
+const inter = Inter({
+  subsets: ['latin'],
+  variable: '--font-inter', // CSS variable for Inter
+  display: 'swap',
+});
+
+const spaceGrotesk = Space_Grotesk({
+  subsets: ['latin'],
+  variable: '--font-space-grotesk', // CSS variable for Space Grotesk
+  display: 'swap',
+});
 
 export const metadata: Metadata = {
   title: 'CoTBE Portal',
@@ -15,12 +29,9 @@ export default function RootLayout({
   children: React.ReactNode;
 }>) {
   return (
-    <html lang="en" suppressHydrationWarning>
+    <html lang="en" suppressHydrationWarning className={`${inter.variable} ${spaceGrotesk.variable}`}>
       <head>
-        <link rel="preconnect" href="https://fonts.googleapis.com" />
-        <link rel="preconnect" href="https://fonts.gstatic.com" crossOrigin="anonymous" />
-        <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet" />
-        <link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@400;500;600;700&display=swap" rel="stylesheet" />
+        {/* Removed direct Google Font links, next/font handles this */}
       </head>
       <body className="font-body antialiased">
         <Providers>

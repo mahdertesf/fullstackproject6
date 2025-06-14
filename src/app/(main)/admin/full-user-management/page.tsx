@@ -13,13 +13,14 @@ import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, Di
 import { useAuthStore } from '@/store/authStore';
 import { useRouter } from 'next/navigation';
 import { Users, ShieldAlert, PlusCircle, Edit, Trash2, Search, Filter, MoreHorizontal, Loader2 } from 'lucide-react';
-import type { UserProfile as FullUserProfile, UserRole } from '@prisma/client'; // Use Prisma types
+import type { UserProfile as FullUserProfile, UserRole, Department as PrismaDepartment } from '@prisma/client'; // Use Prisma types
 import { Badge } from '@/components/ui/badge';
 import AddUserForm from '@/components/users/AddUserForm';
 import EditUserForm from '@/components/users/EditUserForm';
 import { NewUserFormData, EditUserFormData } from '@/lib/schemas';
 import { useToast } from '@/hooks/use-toast';
 import { getAllUsers, createUser, updateUser, deleteUser } from '@/actions/userActions';
+import { getAllDepartments } from '@/actions/departmentActions'; // To fetch departments
 
 const ITEMS_PER_PAGE = 10;
 
@@ -37,14 +38,19 @@ export default function FullUserManagementPage() {
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [isLoadingData, setIsLoadingData] = useState(true);
   const [usersList, setUsersList] = useState<FullUserProfile[]>([]);
+  const [departments, setDepartments] = useState<PrismaDepartment[]>([]);
 
-  const fetchUsers = async () => {
+  const fetchPageData = async () => {
     setIsLoadingData(true);
     try {
-      const data = await getAllUsers({ searchTerm, role: selectedRole }, currentUser?.user_id, currentUser?.is_super_admin);
-      setUsersList(data);
+      const [usersData, departmentsData] = await Promise.all([
+        getAllUsers({ searchTerm, role: selectedRole }, currentUser?.user_id, currentUser?.is_super_admin),
+        getAllDepartments()
+      ]);
+      setUsersList(usersData);
+      setDepartments(departmentsData);
     } catch (error) {
-      toast({ variant: 'destructive', title: 'Error', description: 'Failed to load users.' });
+      toast({ variant: 'destructive', title: 'Error', description: 'Failed to load page data.' });
     } finally {
       setIsLoadingData(false);
     }
@@ -54,15 +60,14 @@ export default function FullUserManagementPage() {
     if (currentUser && !currentUser.is_super_admin) {
       router.replace('/dashboard'); 
     } else if (currentUser?.is_super_admin) {
-      fetchUsers();
+      fetchPageData();
     }
   }, [currentUser, router]);
 
   useEffect(() => {
     if (currentUser?.is_super_admin) {
-        // Debounce or use startTransition for search/filter
         const handler = setTimeout(() => {
-             startTransition(() => { fetchUsers(); });
+             startTransition(() => { fetchPageData(); });
         }, 300);
         return () => clearTimeout(handler);
     }
@@ -88,7 +93,7 @@ export default function FullUserManagementPage() {
       toast({ title: 'User Updated', description: `User ${data.username} has been updated.` });
       setIsEditUserDialogOpen(false);
       setEditingUser(null);
-      startTransition(() => { fetchUsers(); });
+      startTransition(() => { fetchPageData(); });
     } catch (error) {
       toast({ variant: 'destructive', title: 'Error', description: (error as Error).message || 'Failed to update user.' });
     } finally {
@@ -103,11 +108,11 @@ export default function FullUserManagementPage() {
      if (!confirm(`Are you sure you want to delete user "${userToDelete.username}"? This action cannot be undone.`)) {
         return;
     }
-    setIsSubmitting(true); // General submitting state for delete as well
+    setIsSubmitting(true); 
     try {
       await deleteUser(userId, currentUser.user_id);
       toast({ title: 'User Deleted', description: `User ${userToDelete.username} has been removed.` });
-      startTransition(() => { fetchUsers(); });
+      startTransition(() => { fetchPageData(); });
     } catch (error) {
       toast({ variant: 'destructive', title: 'Error', description: (error as Error).message || 'Failed to delete user.' });
     } finally {
@@ -122,7 +127,7 @@ export default function FullUserManagementPage() {
       await createUser(data, currentUser.role, currentUser.is_super_admin);
       toast({ title: 'User Created', description: `User ${data.username} has been created.` });
       setIsAddUserDialogOpen(false);
-      startTransition(() => { fetchUsers(); });
+      startTransition(() => { fetchPageData(); });
     } catch (error) {
       toast({ variant: 'destructive', title: 'Error', description: (error as Error).message || 'Failed to create user.' });
     } finally {
@@ -168,6 +173,7 @@ export default function FullUserManagementPage() {
                 onCancel={() => setIsAddUserDialogOpen(false)}
                 availableRoles={availableRoles}
                 isSubmitting={isSubmitting}
+                departments={departments}
               />
             </DialogContent>
           </Dialog>
@@ -221,6 +227,7 @@ export default function FullUserManagementPage() {
                 <TableHead>Username</TableHead>
                 <TableHead>Email</TableHead>
                 <TableHead>Role</TableHead>
+                <TableHead>Department</TableHead>
                 <TableHead>Status</TableHead>
                 <TableHead className="text-right">Actions</TableHead>
               </TableRow>
@@ -240,6 +247,7 @@ export default function FullUserManagementPage() {
                         {u.is_super_admin ? 'Super Admin' : u.role}
                       </Badge>
                     </TableCell>
+                     <TableCell>{u.student_profile?.department?.name || u.teacher_profile?.department?.name || 'N/A'}</TableCell>
                     <TableCell>
                       <Badge variant={u.is_active ? 'default' : 'destructive'} className={u.is_active ? 'bg-green-500 hover:bg-green-600' : ''}>
                         {u.is_active ? 'Active' : 'Inactive'}
@@ -251,7 +259,10 @@ export default function FullUserManagementPage() {
                            <Button 
                             variant="ghost" 
                             size="icon" 
-                            disabled={(u.is_super_admin && currentUser?.user_id !== u.user_id && !currentUser?.is_super_admin) || isSubmitting}
+                            disabled={
+                                (u.is_super_admin && currentUser?.user_id === u.user_id) || // Super admin cannot perform actions on themselves via this menu
+                                isSubmitting
+                            }
                            >
                             <MoreHorizontal className="h-4 w-4" />
                             <span className="sr-only">Actions</span>
@@ -260,14 +271,14 @@ export default function FullUserManagementPage() {
                         <DropdownMenuContent align="end">
                           <DropdownMenuItem 
                             onClick={() => handleOpenEditDialog(u)}
-                            disabled={(u.is_super_admin && currentUser?.user_id !== u.user_id && !currentUser?.is_super_admin)}
+                            disabled={u.is_super_admin && currentUser?.user_id === u.user_id } // Cannot edit self if super admin
                           >
                             <Edit className="mr-2 h-4 w-4" /> Edit
                           </DropdownMenuItem>
                           <DropdownMenuItem 
                             onClick={() => handleDeleteUser(u.user_id)} 
                             className="text-destructive focus:text-destructive focus:bg-destructive/10"
-                            disabled={u.user_id === currentUser?.user_id || (u.is_super_admin && !currentUser?.is_super_admin)}
+                            disabled={u.user_id === currentUser?.user_id || (u.is_super_admin && !currentUser?.is_super_admin)} // Cannot delete self, non-SA cannot delete SA
                           >
                             <Trash2 className="mr-2 h-4 w-4" /> Delete
                           </DropdownMenuItem>
@@ -278,7 +289,7 @@ export default function FullUserManagementPage() {
                 ))
               ) : (
                 <TableRow>
-                  <TableCell colSpan={6} className="text-center h-24">
+                  <TableCell colSpan={7} className="text-center h-24"> 
                     No users found matching your criteria.
                   </TableCell>
                 </TableRow>
@@ -289,7 +300,7 @@ export default function FullUserManagementPage() {
       </Card>
       )}
         {totalPages > 1 && (
-        <div className="flex justify-center mt-4">
+        <div className="flex justify-center mt-4 space-x-2">
           <Button
             variant="outline"
             onClick={() => setCurrentPage(p => Math.max(1, p - 1))}
@@ -297,7 +308,7 @@ export default function FullUserManagementPage() {
           >
             Previous
           </Button>
-          <span className="mx-4 self-center">
+          <span className="mx-2 self-center">
             Page {currentPage} of {totalPages}
           </span>
           <Button
@@ -330,6 +341,7 @@ export default function FullUserManagementPage() {
               isSubmitting={isSubmitting}
               currentUserRole={currentUser?.role}
               isCurrentUserSuperAdmin={currentUser?.is_super_admin}
+              departments={departments}
             />
           </DialogContent>
         </Dialog>

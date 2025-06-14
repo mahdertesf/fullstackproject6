@@ -16,17 +16,19 @@ import {
 import { Input } from '@/components/ui/input';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { NewUserSchema, type NewUserFormData } from '@/lib/schemas';
-import type { UserRole } from '@/types';
+import type { UserRole, Department } from '@/types'; // Added Department
 import { Loader2 } from 'lucide-react';
+import { useEffect, useState } from 'react'; // Added useState
 
 interface AddUserFormProps {
   onSubmit: (data: NewUserFormData) => Promise<void>;
   onCancel: () => void;
   availableRoles: UserRole[];
   isSubmitting: boolean;
+  departments: Department[]; // Added departments
 }
 
-export default function AddUserForm({ onSubmit, onCancel, availableRoles, isSubmitting }: AddUserFormProps) {
+export default function AddUserForm({ onSubmit, onCancel, availableRoles, isSubmitting, departments }: AddUserFormProps) {
   const form = useForm<NewUserFormData>({
     resolver: zodResolver(NewUserSchema),
     defaultValues: {
@@ -35,14 +37,16 @@ export default function AddUserForm({ onSubmit, onCancel, availableRoles, isSubm
       firstName: '',
       lastName: '',
       role: undefined, 
+      department_id: undefined,
       password: '',
       confirmPassword: '',
     },
   });
 
+  const watchedRole = form.watch("role");
+
   const handleSubmit = async (data: NewUserFormData) => {
     await onSubmit(data);
-    // form.reset(); // Resetting form is handled by dialog close usually
   };
 
   return (
@@ -126,6 +130,32 @@ export default function AddUserForm({ onSubmit, onCancel, availableRoles, isSubm
             </FormItem>
           )}
         />
+        {(watchedRole === 'Student' || watchedRole === 'Teacher') && (
+          <FormField
+            control={form.control}
+            name="department_id"
+            render={({ field }) => (
+              <FormItem>
+                <FormLabel>Department</FormLabel>
+                <Select onValueChange={field.onChange} defaultValue={field.value}>
+                  <FormControl>
+                    <SelectTrigger>
+                      <SelectValue placeholder="Select a department" />
+                    </SelectTrigger>
+                  </FormControl>
+                  <SelectContent>
+                    {departments.map(dept => (
+                      <SelectItem key={dept.department_id} value={String(dept.department_id)}>
+                        {dept.name}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+                <FormMessage />
+              </FormItem>
+            )}
+          />
+        )}
         <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
           <FormField
             control={form.control}
