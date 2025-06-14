@@ -1,15 +1,14 @@
 // src/app/(main)/study-guide/page.tsx
-
 'use client';
 
 import PageHeader from '@/components/shared/PageHeader';
 import StudyGuideGeneratorForm from '@/components/study-guide/StudyGuideGeneratorForm';
 import { useAuthStore } from '@/store/authStore';
 import { useRouter } from 'next/navigation';
-import { useEffect, useState, useMemo } from 'react';
+import { useEffect, useState, startTransition } from 'react';
 import { Layers, ShieldAlert, BookOpenText, FileText, Link as LinkIcon, Download, Wand2, Combine, MessageSquareQuote, HelpCircle, Loader2 } from 'lucide-react';
-import { mockRegistrations, mockCourses, mockSemesters, mockCourseMaterials, mockScheduledCourses, mockUserProfiles } from '@/lib/data';
-import type { UserProfile, Semester, Course, CourseMaterial, Registration, ScheduledCourse, MaterialType } from '@/types';
+import type { UserProfile as AuthUserProfile, Semester, Course as ClientCourse, CourseMaterial as ClientCourseMaterial, Registration as ClientRegistration, ScheduledCourse as ClientScheduledCourse, MaterialType as ClientMaterialType } from '@/types';
+import type { CourseMaterial as PrismaCourseMaterial, User as PrismaUser, ScheduledCourse as PrismaScheduledCourse, Course as PrismaCourse } from '@prisma/client'; // Prisma types
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from '@/components/ui/accordion';
@@ -21,19 +20,17 @@ import { Separator } from '@/components/ui/separator';
 import { processCourseMaterial, type AiStudyGuideMaterialInput } from '@/ai/flows/ai-study-guide-material-flow';
 import ReactMarkdown from 'react-markdown';
 import { ScrollArea } from '@/components/ui/scroll-area';
+import { getStudentRegistrations, type EnrichedRegistration as ServerEnrichedRegistration } from '@/actions/studentActions';
+import { getCourseMaterialsForScheduledCourse } from '@/actions/teacherActions';
 
 
 interface StudentCourseWithMaterials {
-  registration: Registration;
-  scheduledCourse?: ScheduledCourse;
-  courseDetails?: Course;
-  semesterDetails?: Semester;
-  materials: CourseMaterial[];
-  teacherDetails?: UserProfile;
+  registration: ServerEnrichedRegistration;
+  materials: PrismaCourseMaterial[];
 }
 
 interface SemesterGroupedCourses {
-  semester: Semester;
+  semester: Semester; // Assuming Semester type from @/types is compatible with PrismaSemester
   courses: StudentCourseWithMaterials[];
 }
 
@@ -52,45 +49,62 @@ export default function StudyGuideAndMaterialsPage() {
 
 
   useEffect(() => {
-    if (user && user.role !== 'Student') {
-      router.replace('/dashboard'); 
-    } else if (user && user.role === 'Student') {
-      const studentUser = user as UserProfile;
-      const studentRegistrations = mockRegistrations.filter(reg => reg.student_id === studentUser.user_id);
-
-      const coursesWithDetails: StudentCourseWithMaterials[] = studentRegistrations.map(reg => {
-        const scheduledCourse = mockScheduledCourses.find(sc => sc.scheduled_course_id === reg.scheduled_course_id);
-        const courseDetails = scheduledCourse ? mockCourses.find(c => c.course_id === scheduledCourse.course_id) : undefined;
-        const semesterDetails = scheduledCourse ? mockSemesters.find(s => s.semester_id === scheduledCourse.semester_id) : undefined;
-        const teacherDetails = scheduledCourse ? mockUserProfiles.find(u => u.user_id === scheduledCourse.teacher_id) : undefined;
-        
-        const materials = scheduledCourse 
-          ? mockCourseMaterials.filter(cm => cm.scheduled_course_id === scheduledCourse.scheduled_course_id) 
-          : [];
-
-        return { registration: reg, scheduledCourse, courseDetails, semesterDetails, materials, teacherDetails };
-      }).filter(item => item.courseDetails && item.semesterDetails);
-
-      const semesterMap = new Map<number, StudentCourseWithMaterials[]>();
-      coursesWithDetails.forEach(courseItem => {
-        if (courseItem.semesterDetails) {
-          const semesterId = courseItem.semesterDetails.semester_id;
-          if (!semesterMap.has(semesterId)) semesterMap.set(semesterId, []);
-          semesterMap.get(semesterId)?.push(courseItem);
-        }
-      });
-      
-      const grouped: SemesterGroupedCourses[] = Array.from(semesterMap.entries()).map(([semesterId, courses]) => ({
-        semester: mockSemesters.find(s => s.semester_id === semesterId)!,
-        courses,
-      })).sort((a, b) => new Date(b.semester.start_date).getTime() - new Date(a.semester.start_date).getTime());
-
-      setGroupedCoursesBySemester(grouped);
-      setIsLoadingMaterials(false);
-    } else if (!user) {
-        router.replace('/login');
+    if (!user) {
+      router.replace('/login');
+      return;
     }
-  }, [user, router]);
+    if (user.role !== 'Student') {
+      router.replace('/dashboard'); 
+      return;
+    }
+
+    const fetchStudentData = async () => {
+      setIsLoadingMaterials(true);
+      try {
+        const studentRegs = await getStudentRegistrations(user.user_id);
+        
+        const coursesWithDetailsPromises = studentRegs.map(async (reg) => {
+          let materials: PrismaCourseMaterial[] = [];
+          if (reg.scheduledCourse?.scheduled_course_id) {
+            materials = await getCourseMaterialsForScheduledCourse(reg.scheduledCourse.scheduled_course_id);
+          }
+          return { registration: reg, materials };
+        });
+
+        const coursesWithDetails = await Promise.all(coursesWithDetailsPromises);
+
+        const semesterMap = new Map<number, StudentCourseWithMaterials[]>();
+        coursesWithDetails.forEach(courseItem => {
+          // Ensure scheduledCourse and semester exist before proceeding
+          if (courseItem.registration.scheduledCourse?.semester) {
+            const semesterId = courseItem.registration.scheduledCourse.semester.semester_id;
+            if (!semesterMap.has(semesterId)) {
+              semesterMap.set(semesterId, []);
+            }
+            semesterMap.get(semesterId)?.push(courseItem);
+          }
+        });
+        
+        const grouped: SemesterGroupedCourses[] = Array.from(semesterMap.entries()).map(([semesterId, courses]) => {
+          // Find the semester details from the first course item, assuming all courses in this group share the same semester
+          // Ensure semester is correctly typed
+          const semester = courses[0]?.registration.scheduledCourse?.semester as Semester | undefined; 
+          return { semester: semester!, courses }; // Non-null assertion if sure semester always exists, else handle undefined
+        }).filter(sg => sg.semester) // Filter out any groups where semester might be missing
+        .sort((a, b) => new Date(b.semester.start_date).getTime() - new Date(a.semester.start_date).getTime());
+
+        setGroupedCoursesBySemester(grouped);
+      } catch (error) {
+        console.error("Failed to load student materials:", error);
+        toast({ variant: "destructive", title: "Error", description: "Failed to load your course materials."});
+      } finally {
+        setIsLoadingMaterials(false);
+      }
+    };
+    
+    startTransition(() => { fetchStudentData(); });
+
+  }, [user, router, toast]);
 
   const handleMockDownload = (filePath: string | null | undefined, materialTitle: string) => {
     if (!filePath) {
@@ -98,10 +112,9 @@ export default function StudyGuideAndMaterialsPage() {
       return;
     }
     toast({ title: 'Mock Download Initiated', description: `Simulating download for: ${materialTitle}` });
-    // Simulate browser download
     const link = document.createElement('a');
-    link.href = filePath; // In a real app, this would be an actual URL to the file
-    link.setAttribute('download', materialTitle.replace(/[^a-zA-Z0-9_.-]/g, '_') + '.pdf'); // Sanitize filename
+    link.href = filePath; 
+    link.setAttribute('download', materialTitle.replace(/[^a-zA-Z0-9_.-]/g, '_') + '.pdf'); 
     document.body.appendChild(link);
     link.click();
     document.body.removeChild(link);
@@ -109,7 +122,7 @@ export default function StudyGuideAndMaterialsPage() {
 
   const handleAiMaterialAction = async (
     actionType: 'Summarize' | 'GenerateQuestions' | 'ExplainDetails',
-    material: CourseMaterial,
+    material: PrismaCourseMaterial, // Use Prisma type
     courseName: string | undefined
   ) => {
     if (!courseName) {
@@ -134,7 +147,7 @@ export default function StudyGuideAndMaterialsPage() {
         materialDescription: material.description || undefined,
         courseName: courseName,
         actionType: actionType,
-        materialType: material.material_type,
+        materialType: material.material_type as ClientMaterialType, // Cast Prisma enum to client enum
         materialPathOrUrl: material.material_type === 'File' ? material.file_path || undefined : material.url || undefined,
       };
       const result = await processCourseMaterial(input);
@@ -173,14 +186,14 @@ export default function StudyGuideAndMaterialsPage() {
         icon={Layers}
       />
       
-      <StudyGuideGeneratorForm />
+      <StudyGuideGeneratorForm /> {/* This form uses mockCourses for selection. To make it fully dynamic, it would need to fetch courses available to the student. */}
 
       <Separator className="my-8" />
 
       <div>
         <h2 className="text-2xl font-bold tracking-tight text-foreground font-headline mb-4">My Course Materials</h2>
         {isLoadingMaterials ? (
-           <p className="text-muted-foreground text-center">Loading your course materials...</p>
+           <div className="flex justify-center items-center p-8"><Loader2 className="h-8 w-8 animate-spin text-primary" /><span className="ml-2">Loading your course materials...</span></div>
         ) : groupedCoursesBySemester.length > 0 ? (
           <Accordion type="multiple" defaultValue={groupedCoursesBySemester.map(sg => `semester-${sg.semester.semester_id}`)} className="w-full space-y-4">
             {groupedCoursesBySemester.map(({ semester, courses }) => (
@@ -200,13 +213,13 @@ export default function StudyGuideAndMaterialsPage() {
                       <Card key={courseItem.registration.registration_id} className="m-2 shadow-none border-0 rounded-none">
                         <CardHeader className="p-3">
                           <CardTitle className="text-md font-semibold">
-                            <Link href={`/courses/${courseItem.courseDetails?.course_id}`} className="hover:underline text-primary">
-                              {courseItem.courseDetails?.course_code} - {courseItem.courseDetails?.title}
+                            <Link href={`/courses/${courseItem.registration.scheduledCourse?.course?.course_id}`} className="hover:underline text-primary">
+                              {courseItem.registration.scheduledCourse?.course?.course_code} - {courseItem.registration.scheduledCourse?.course?.title}
                             </Link>
                           </CardTitle>
                           <CardDescription>
-                            Instructor: {courseItem.teacherDetails?.first_name} {courseItem.teacherDetails?.last_name || 'N/A'}
-                             | Section: {courseItem.scheduledCourse?.section_number}
+                            Instructor: {courseItem.registration.scheduledCourse?.teacher?.first_name} {courseItem.registration.scheduledCourse?.teacher?.last_name || 'N/A'}
+                             | Section: {courseItem.registration.scheduledCourse?.section_number}
                           </CardDescription>
                         </CardHeader>
                         <CardContent className="p-3">
@@ -242,13 +255,13 @@ export default function StudyGuideAndMaterialsPage() {
                                           </Button>
                                         </DropdownMenuTrigger>
                                         <DropdownMenuContent align="end">
-                                          <DropdownMenuItem onClick={() => handleAiMaterialAction('Summarize', material, courseItem.courseDetails?.title)}>
+                                          <DropdownMenuItem onClick={() => handleAiMaterialAction('Summarize', material, courseItem.registration.scheduledCourse?.course?.title)}>
                                             <Combine className="mr-2 h-4 w-4" /> Summarize
                                           </DropdownMenuItem>
-                                          <DropdownMenuItem onClick={() => handleAiMaterialAction('GenerateQuestions', material, courseItem.courseDetails?.title)}>
+                                          <DropdownMenuItem onClick={() => handleAiMaterialAction('GenerateQuestions', material, courseItem.registration.scheduledCourse?.course?.title)}>
                                             <MessageSquareQuote className="mr-2 h-4 w-4" /> Generate Questions
                                           </DropdownMenuItem>
-                                          <DropdownMenuItem onClick={() => handleAiMaterialAction('ExplainDetails', material, courseItem.courseDetails?.title)}>
+                                          <DropdownMenuItem onClick={() => handleAiMaterialAction('ExplainDetails', material, courseItem.registration.scheduledCourse?.course?.title)}>
                                             <HelpCircle className="mr-2 h-4 w-4" /> Explain Details
                                           </DropdownMenuItem>
                                         </DropdownMenuContent>
@@ -329,4 +342,3 @@ export default function StudyGuideAndMaterialsPage() {
     </div>
   );
 }
-

@@ -11,17 +11,22 @@ import { Textarea } from '@/components/ui/textarea';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { StudyGuideGeneratorSchema, type StudyGuideGeneratorFormData } from '@/lib/schemas';
 import { generateStudyGuide } from '@/ai/flows/ai-study-guide';
-import { useState } from 'react';
+import { useState, useEffect, startTransition } from 'react';
 import { Wand2, Loader2, BookOpenCheck } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
-import { mockCourses } from '@/lib/data'; // For course selection
+import type { Course as PrismaCourse } from '@prisma/client'; // Use Prisma type
+import { getStudentRegistrations } from '@/actions/studentActions'; // To get student's courses
+import { useAuthStore } from '@/store/authStore';
 import ReactMarkdown from 'react-markdown';
 import { ScrollArea } from '@/components/ui/scroll-area';
 
 export default function StudyGuideGeneratorForm() {
   const { toast } = useToast();
+  const { user } = useAuthStore();
   const [isLoadingAi, setIsLoadingAi] = useState(false);
   const [generatedStudyGuide, setGeneratedStudyGuide] = useState<string | null>(null);
+  const [studentCourses, setStudentCourses] = useState<PrismaCourse[]>([]);
+  const [isLoadingCourses, setIsLoadingCourses] = useState(true);
 
   const form = useForm<StudyGuideGeneratorFormData>({
     resolver: zodResolver(StudyGuideGeneratorSchema),
@@ -32,11 +37,38 @@ export default function StudyGuideGeneratorForm() {
     },
   });
 
+  useEffect(() => {
+    const fetchStudentCourses = async () => {
+      if (user && user.role === 'Student') {
+        setIsLoadingCourses(true);
+        try {
+          const registrations = await getStudentRegistrations(user.user_id);
+          const courses = registrations
+            .map(reg => reg.scheduledCourse?.course)
+            .filter((course): course is PrismaCourse => course !== null && course !== undefined);
+          
+          // Deduplicate courses by course_id
+          const uniqueCourses = Array.from(new Map(courses.map(course => [course.course_id, course])).values());
+          setStudentCourses(uniqueCourses);
+        } catch (error) {
+          console.error("Failed to fetch student courses for study guide:", error);
+          toast({ variant: 'destructive', title: 'Error', description: 'Could not load your courses for selection.' });
+        } finally {
+          setIsLoadingCourses(false);
+        }
+      } else {
+        setIsLoadingCourses(false);
+      }
+    };
+    startTransition(() => { fetchStudentCourses(); });
+  }, [user, toast]);
+
+
   const handleGenerateStudyGuide = async (data: StudyGuideGeneratorFormData) => {
     setIsLoadingAi(true);
     setGeneratedStudyGuide(null); 
     try {
-      const course = mockCourses.find(c => c.course_id === parseInt(data.courseId));
+      const course = studentCourses.find(c => c.course_id === parseInt(data.courseId));
       if (!course) {
         toast({ variant: 'destructive', title: 'Error', description: 'Selected course not found.' });
         setIsLoadingAi(false);
@@ -58,7 +90,7 @@ export default function StudyGuideGeneratorForm() {
       toast({
         variant: 'destructive',
         title: 'AI Generation Failed',
-        description: 'Could not generate study guide. Please try again.',
+        description: (error as Error).message || 'Could not generate study guide. Please try again.',
       });
     } finally {
       setIsLoadingAi(false);
@@ -81,18 +113,22 @@ export default function StudyGuideGeneratorForm() {
                 render={({ field }) => (
                   <FormItem>
                     <FormLabel>Select Course</FormLabel>
-                    <Select onValueChange={field.onChange} defaultValue={field.value}>
+                    <Select onValueChange={field.onChange} defaultValue={field.value} disabled={isLoadingCourses || studentCourses.length === 0}>
                       <FormControl>
                         <SelectTrigger>
-                          <SelectValue placeholder="Choose a course" />
+                          <SelectValue placeholder={isLoadingCourses ? "Loading courses..." : "Choose one of your courses"} />
                         </SelectTrigger>
                       </FormControl>
                       <SelectContent>
-                        {mockCourses.map(course => (
-                          <SelectItem key={course.course_id} value={String(course.course_id)}>
-                            {course.course_code} - {course.title}
-                          </SelectItem>
-                        ))}
+                        {!isLoadingCourses && studentCourses.length > 0 ? (
+                          studentCourses.map(course => (
+                            <SelectItem key={course.course_id} value={String(course.course_id)}>
+                              {course.course_code} - {course.title}
+                            </SelectItem>
+                          ))
+                        ) : (
+                          !isLoadingCourses && <SelectItem value="no-courses" disabled>No courses found</SelectItem>
+                        )}
                       </SelectContent>
                     </Select>
                     <FormMessage />
@@ -131,7 +167,7 @@ export default function StudyGuideGeneratorForm() {
               />
             </CardContent>
             <CardFooter>
-              <Button type="submit" disabled={isLoadingAi} className="w-full bg-accent hover:bg-accent/90">
+              <Button type="submit" disabled={isLoadingAi || isLoadingCourses || studentCourses.length === 0} className="w-full bg-accent hover:bg-accent/90">
                 {isLoadingAi ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <Wand2 className="mr-2 h-4 w-4" />}
                 Generate Study Guide
               </Button>

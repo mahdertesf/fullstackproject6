@@ -4,17 +4,18 @@
 import { useAuthStore } from '@/store/authStore';
 import PageHeader from '@/components/shared/PageHeader';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
-import { Home, User, BookOpen, BarChart3, Speaker as SpeakerIcon, Loader2 } from 'lucide-react';
+import { Home, User, BookOpen, BarChart3, Speaker as SpeakerIcon, Users, CalendarPlus, UserPlus, Loader2 } from 'lucide-react';
 import Link from 'next/link';
 import { Button } from '@/components/ui/button';
 import { format } from 'date-fns';
 import { useEffect, useState, useMemo } from 'react';
 
-// Actions (replace with actual imports if split out)
-import { getAdminDashboardStats, type DashboardStats } from '@/actions/adminActions';
+// Actions
+import { getAdminDashboardStats, type DashboardStats as AdminDashboardStats } from '@/actions/adminActions';
+import { getStaffDashboardStats, type StaffDashboardStats } from '@/actions/staffActions';
 import { getAnnouncementsForUser } from '@/actions/announcementActions';
-import { getStudentRegistrations } from '@/actions/studentActions'; // For student schedule
-import { getScheduledCoursesByTeacher } from '@/actions/scheduledCourseActions'; // For teacher courses
+import { getStudentRegistrations } from '@/actions/studentActions'; 
+import { getScheduledCoursesByTeacher } from '@/actions/scheduledCourseActions'; 
 import type { Announcement, ScheduledCourse as PrismaScheduledCourse, Course as PrismaCourse, Semester as PrismaSemester, User as PrismaUser, UserProfile } from '@prisma/client';
 
 // Types for enriched data
@@ -23,7 +24,7 @@ type TeacherScheduledCourse = PrismaScheduledCourse & { course: PrismaCourse | n
 
 
 const AdminDashboardContent = () => {
-  const [stats, setStats] = useState<DashboardStats | null>(null);
+  const [stats, setStats] = useState<AdminDashboardStats | null>(null);
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
@@ -44,7 +45,7 @@ const AdminDashboardContent = () => {
       <Card>
         <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
           <CardTitle className="text-sm font-medium">Total Users</CardTitle>
-          <User className="h-4 w-4 text-muted-foreground" />
+          <Users className="h-4 w-4 text-muted-foreground" />
         </CardHeader>
         <CardContent>
           <div className="text-2xl font-bold">{stats.totalUsers}</div>
@@ -75,28 +76,52 @@ const AdminDashboardContent = () => {
 };
 
 const StaffDashboardContent = () => {
-  // Placeholder for Staff specific data fetching
+  const [stats, setStats] = useState<StaffDashboardStats | null>(null);
+  const [loading, setLoading] = useState(true);
+
+  useEffect(() => {
+    getStaffDashboardStats().then(data => {
+      setStats(data);
+      setLoading(false);
+    }).catch(err => {
+      console.error("Failed to load staff stats:", err);
+      setLoading(false);
+    });
+  }, []);
+
+  if (loading) return <div className="flex justify-center items-center p-8"><Loader2 className="h-8 w-8 animate-spin text-primary" /></div>;
+  if (!stats) return <p>Could not load staff dashboard statistics.</p>;
+  
   return (
-    <div className="grid gap-6 md:grid-cols-2">
-      <Card>
-        <CardHeader>
-          <CardTitle>Semester Operations</CardTitle>
-          <CardDescription>Overview for the current semester.</CardDescription>
+    <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-3">
+       <Card>
+        <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+          <CardTitle className="text-sm font-medium">Upcoming Scheduled Courses</CardTitle>
+          <CalendarPlus className="h-4 w-4 text-muted-foreground" />
         </CardHeader>
         <CardContent>
-          <p>Current Semester: Spring 2024 (Placeholder)</p>
-          <p>Total Scheduled Courses: (Fetch data)</p>
-          <Link href="/staff/schedule-courses"><Button className="mt-4">Schedule New Course</Button></Link>
+          <div className="text-2xl font-bold">{stats.upcomingScheduledCourses}</div>
+          <p className="text-xs text-muted-foreground">Courses scheduled for next month</p>
         </CardContent>
       </Card>
       <Card>
-        <CardHeader>
-          <CardTitle>Announcements</CardTitle>
-          <CardDescription>Manage university-wide announcements.</CardDescription>
+        <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+          <CardTitle className="text-sm font-medium">New Student/Teacher Accounts</CardTitle>
+          <UserPlus className="h-4 w-4 text-muted-foreground" />
         </CardHeader>
         <CardContent>
-          <p>Published Announcements: (Fetch data)</p>
-          <Link href="/announcements/create"><Button className="mt-4">Create Announcement</Button></Link>
+          <div className="text-2xl font-bold">{stats.recentStudentTeacherAccounts}</div>
+          <p className="text-xs text-muted-foreground">Created in the last 7 days</p>
+        </CardContent>
+      </Card>
+      <Card>
+        <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+          <CardTitle className="text-sm font-medium">Quick Links</CardTitle>
+           <User className="h-4 w-4 text-muted-foreground" />
+        </CardHeader>
+        <CardContent className="flex flex-col space-y-2">
+          <Button asChild variant="outline" size="sm"><Link href="/staff/schedule-courses">Schedule Course</Link></Button>
+          <Button asChild variant="outline" size="sm"><Link href="/announcements/create">Create Announcement</Link></Button>
         </CardContent>
       </Card>
     </div>
@@ -110,7 +135,7 @@ const TeacherDashboardContent = ({ user }: { user: UserProfile }) => {
   useEffect(() => {
     if (user.user_id) {
       getScheduledCoursesByTeacher(user.user_id).then(data => {
-        setMyCourses(data as TeacherScheduledCourse[]); // Assuming type compatibility
+        setMyCourses(data as TeacherScheduledCourse[]); 
         setLoading(false);
       }).catch(err => {
          console.error("Failed to load teacher courses:", err);
@@ -131,14 +156,17 @@ const TeacherDashboardContent = ({ user }: { user: UserProfile }) => {
         <CardContent>
           {myCourses.length > 0 ? (
             <ul className="space-y-2">
-              {myCourses.slice(0,3).map(sc => ( // Show first 3
-                <li key={sc.scheduled_course_id}>
-                  {sc.course?.course_code} - {sc.course?.title} (Sec: {sc.section_number}) - {sc.semester?.name}
+              {myCourses.slice(0,3).map(sc => ( 
+                <li key={sc.scheduled_course_id} className="text-sm">
+                  <Link href={`/teacher/my-courses/${sc.scheduled_course_id}`} className="font-medium hover:underline">
+                    {sc.course?.course_code} - {sc.course?.title}
+                  </Link>
+                  <span className="text-muted-foreground"> (Sec: {sc.section_number}) - {sc.semester?.name}</span>
                 </li>
               ))}
             </ul>
-          ) : <p>No courses assigned for the current/upcoming semesters.</p>}
-          <Link href="/teacher/my-courses"><Button variant="link" className="p-0 mt-2">View all my courses</Button></Link>
+          ) : <p className="text-sm text-muted-foreground">No courses assigned for the current/upcoming semesters.</p>}
+          <Link href="/teacher/my-courses"><Button variant="link" className="p-0 mt-2 h-auto text-sm">View all my courses</Button></Link>
         </CardContent>
       </Card>
        <Card>
@@ -147,7 +175,7 @@ const TeacherDashboardContent = ({ user }: { user: UserProfile }) => {
            <CardDescription>Assessments due soon for your courses. (Placeholder)</CardDescription>
         </CardHeader>
         <CardContent>
-          <p>Homework 1 (Placeholder) - Due in 3 days</p>
+          <p className="text-sm text-muted-foreground">Homework 1 (Placeholder) - Due in 3 days</p>
         </CardContent>
       </Card>
     </div>
@@ -164,18 +192,16 @@ const StudentDashboardContent = ({ user }: { user: UserProfile }) => {
 
   useEffect(() => {
     if (user.user_id) {
-      // Fetch schedule for current semester (logic to find current semester ID needed)
-      // For now, fetch all and filter, or ideally, pass current semester ID to action
-      getStudentRegistrations(user.user_id).then(regs => { // TODO: filter by current semester
+      getStudentRegistrations(user.user_id).then(regs => { 
         const currentRegs = regs
-            .filter(r => r.scheduledCourse?.semester?.end_date && new Date(r.scheduledCourse.semester.end_date) >= now && new Date(r.scheduledCourse.semester.start_date) <= now) // Rough filter
+            .filter(r => r.scheduledCourse?.semester?.end_date && new Date(r.scheduledCourse.semester.end_date) >= now && new Date(r.scheduledCourse.semester.start_date) <= now) 
             .map(r => r.scheduledCourse)
             .filter(Boolean) as StudentScheduledCourse[];
         setSchedule(currentRegs);
         setLoadingSchedule(false);
       }).catch(err => { console.error("Failed to load student schedule:", err); setLoadingSchedule(false); });
 
-      getAnnouncementsForUser(user as PrismaUser).then(data => { // Cast to PrismaUser
+      getAnnouncementsForUser(user as PrismaUser).then(data => { 
         setAnnouncements(data);
         setLoadingAnnouncements(false);
       }).catch(err => { console.error("Failed to load announcements:", err); setLoadingAnnouncements(false); });
@@ -183,7 +209,7 @@ const StudentDashboardContent = ({ user }: { user: UserProfile }) => {
   }, [user, now]);
 
   const recentAnnouncements = useMemo(() => {
-    return announcements.slice(0, 3); // Show top 3 recent
+    return announcements.slice(0, 3); 
   }, [announcements]);
 
 
@@ -195,14 +221,18 @@ const StudentDashboardContent = ({ user }: { user: UserProfile }) => {
           <CardDescription>Your currently registered courses.</CardDescription>
         </CardHeader>
         <CardContent>
-          {loadingSchedule ? <Loader2 className="h-6 w-6 animate-spin" /> : schedule.length > 0 ? (
+          {loadingSchedule ? <div className="flex justify-center py-2"><Loader2 className="h-6 w-6 animate-spin" /></div> : schedule.length > 0 ? (
             <ul className="space-y-2">
               {schedule.slice(0,3).map(sc => (
-                <li key={sc.scheduled_course_id}>{sc.course?.course_code} - {sc.course?.title}</li>
+                <li key={sc.scheduled_course_id} className="text-sm">
+                  <Link href={`/courses/${sc.course?.course_id}`} className="font-medium hover:underline">
+                    {sc.course?.course_code} - {sc.course?.title}
+                  </Link>
+                </li>
               ))}
             </ul>
-          ) : <p>No courses registered for the current semester.</p>}
-          <Link href="/student/my-schedule"><Button variant="link" className="p-0 mt-2">View full schedule</Button></Link>
+          ) : <p className="text-sm text-muted-foreground">No courses registered for the current semester.</p>}
+          <Link href="/student/my-schedule"><Button variant="link" className="p-0 mt-2 h-auto text-sm">View full schedule</Button></Link>
         </CardContent>
       </Card>
       <Card>
@@ -211,7 +241,7 @@ const StudentDashboardContent = ({ user }: { user: UserProfile }) => {
           <CardDescription>Assessments and tasks due soon. (Placeholder)</CardDescription>
         </CardHeader>
         <CardContent>
-          <p>Homework 1 (Placeholder) - Due in 3 days</p>
+          <p className="text-sm text-muted-foreground">Homework 1 (Placeholder) - Due in 3 days</p>
         </CardContent>
       </Card>
       <Card className="md:col-span-2">
@@ -219,7 +249,7 @@ const StudentDashboardContent = ({ user }: { user: UserProfile }) => {
           <CardTitle className="flex items-center"><SpeakerIcon className="mr-2 h-5 w-5 text-primary" />Recent Announcements</CardTitle>
         </CardHeader>
         <CardContent>
-          {loadingAnnouncements ? <Loader2 className="h-6 w-6 animate-spin" /> : recentAnnouncements.length > 0 ? (
+          {loadingAnnouncements ? <div className="flex justify-center py-2"><Loader2 className="h-6 w-6 animate-spin" /></div> : recentAnnouncements.length > 0 ? (
             <ul className="space-y-3">
               {recentAnnouncements.map(ann => (
                 <li key={ann.announcement_id} className="border-b pb-2 last:border-b-0">
@@ -232,7 +262,7 @@ const StudentDashboardContent = ({ user }: { user: UserProfile }) => {
               ))}
             </ul>
           ) : (
-            <p className="text-muted-foreground">No recent announcements for you.</p>
+            <p className="text-sm text-muted-foreground">No recent announcements for you.</p>
           )}
         </CardContent>
       </Card>
