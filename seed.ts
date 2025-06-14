@@ -1,7 +1,11 @@
+
 // seed.ts
 import { PrismaClient, UserRole } from '@prisma/client';
+import bcrypt from 'bcryptjs';
 
 const prisma = new PrismaClient();
+
+const SALT_ROUNDS = 10;
 
 async function main() {
   console.log('Start seeding ...');
@@ -9,9 +13,8 @@ async function main() {
   // --- Create Super Admin User ---
   const adminUsername = 'admin';
   const adminEmail = 'admin@cotbe.edu';
-  // IMPORTANT: In a real application, ALWAYS HASH PASSWORDS before storing them.
-  // For this seed script, we are using a plaintext password for simplicity.
-  const adminPassword = 'adminPass123!'; 
+  const adminPasswordPlain = 'adminPass123!'; 
+  const adminPasswordHashed = await bcrypt.hash(adminPasswordPlain, SALT_ROUNDS);
 
   let adminUser = await prisma.user.findUnique({
     where: { username: adminUsername },
@@ -22,7 +25,7 @@ async function main() {
       data: {
         username: adminUsername,
         email: adminEmail,
-        password_hash: adminPassword, // Store as plaintext; HASH IN PRODUCTION!
+        password_hash: adminPasswordHashed,
         role: UserRole.Staff,
         first_name: 'Super',
         last_name: 'Admin',
@@ -40,13 +43,13 @@ async function main() {
     });
     console.log(`Created super admin user: ${adminUser.username} with ID: ${adminUser.user_id}`);
   } else {
-    console.log(`Admin user "${adminUsername}" already exists. Ensuring it is super admin.`);
+    console.log(`Admin user "${adminUsername}" already exists. Ensuring it is super admin and password is set.`);
     adminUser = await prisma.user.update({
       where: { user_id: adminUser.user_id },
       data: {
         is_super_admin: true,
         role: UserRole.Staff, 
-        password_hash: adminPassword, // Re-set password if needed (HASH IN PRODUCTION)
+        password_hash: adminPasswordHashed, 
         staff_profile: {
           upsert: { 
             where: { staff_id: adminUser.user_id }, 
@@ -75,7 +78,7 @@ async function main() {
   for (const deptData of departmentsToCreate) {
     const department = await prisma.department.upsert({
       where: { name: deptData.name },
-      update: { description: deptData.description }, // Ensure description is updated if it changes
+      update: { description: deptData.description },
       create: deptData,
     });
     createdDepartments.push(department);
@@ -98,7 +101,7 @@ async function main() {
   for (const semData of semestersToCreate) {
     const semester = await prisma.semester.upsert({
         where: { name: semData.name }, 
-        update: semData, // Update existing semester with new dates if they change
+        update: semData, 
         create: semData
     });
     console.log(`Created/Updated semester: ${semester.name}`);
@@ -107,13 +110,14 @@ async function main() {
 
   // --- Create example student, teacher, and staff users ---
   const usersToCreate = [
-    { username: 'student1', email: 'student1@example.com', password_hash: 'studentPass123', role: UserRole.Student, first_name: 'Student', last_name: 'One', is_active: true, is_super_admin: false, department_id: firstDepartmentId },
-    { username: 'teacher1', email: 'teacher1@example.com', password_hash: 'teacherPass123', role: UserRole.Teacher, first_name: 'Teacher', last_name: 'One', is_active: true, is_super_admin: false, department_id: firstDepartmentId },
-    { username: 'staff1', email: 'staff1@example.com', password_hash: 'staffPass123', role: UserRole.Staff, first_name: 'Staff', last_name: 'One', is_active: true, is_super_admin: false },
+    { username: 'student1', email: 'student1@example.com', password_plain: 'studentPass123', role: UserRole.Student, first_name: 'Student', last_name: 'One', is_active: true, is_super_admin: false, department_id: firstDepartmentId },
+    { username: 'teacher1', email: 'teacher1@example.com', password_plain: 'teacherPass123', role: UserRole.Teacher, first_name: 'Teacher', last_name: 'One', is_active: true, is_super_admin: false, department_id: firstDepartmentId },
+    { username: 'staff1', email: 'staff1@example.com', password_plain: 'staffPass123', role: UserRole.Staff, first_name: 'Staff', last_name: 'One', is_active: true, is_super_admin: false },
   ];
 
   for (const userData of usersToCreate) {
     let user = await prisma.user.findUnique({ where: { username: userData.username } });
+    const hashedPassword = await bcrypt.hash(userData.password_plain, SALT_ROUNDS);
     
     const profileDataCreate: any = {};
     const profileDataUpdate: any = {};
@@ -125,9 +129,9 @@ async function main() {
       }
       profileDataCreate.student_profile = { create: { enrollment_date: new Date(), department_id: userData.department_id } };
       profileDataUpdate.student_profile = { upsert: { 
-        where: { student_id: user?.user_id || -1 }, // Use a non-existent ID if user is null
+        where: { student_id: user?.user_id || -1 }, 
         create: { enrollment_date: new Date(), department_id: userData.department_id },
-        update: { department_id: userData.department_id } // Only update department_id if needed
+        update: { department_id: userData.department_id } 
       }};
     } else if (userData.role === UserRole.Teacher) {
       if (!userData.department_id) {
@@ -154,7 +158,7 @@ async function main() {
         data: {
           username: userData.username,
           email: userData.email,
-          password_hash: userData.password_hash, // HASH IN PRODUCTION!
+          password_hash: hashedPassword,
           role: userData.role,
           first_name: userData.first_name,
           last_name: userData.last_name,
@@ -165,12 +169,12 @@ async function main() {
       });
       console.log(`Created user: ${user.username}`);
     } else {
-      // Update existing user, ensure profile exists
+      // Update existing user, ensure profile exists and password is set
       user = await prisma.user.update({
         where: { username: userData.username },
         data: {
           email: userData.email,
-          password_hash: userData.password_hash,
+          password_hash: hashedPassword,
           role: userData.role,
           first_name: userData.first_name,
           last_name: userData.last_name,

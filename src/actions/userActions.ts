@@ -1,10 +1,13 @@
+
 // src/actions/userActions.ts
 'use server';
 
 import { prisma } from '@/lib/prisma';
 import type { User, UserRole, UserProfile as FullUserProfile, Student, Teacher, Staff } from '@prisma/client'; // Using Prisma types directly
 import type { NewUserFormData, EditUserFormData } from '@/lib/schemas';
-// import bcrypt from 'bcryptjs'; // TODO: For password hashing
+import bcrypt from 'bcryptjs';
+
+const SALT_ROUNDS = 10;
 
 interface UserFilters {
   searchTerm?: string;
@@ -68,8 +71,7 @@ export async function getAllUsers(filters: UserFilters, currentUserId?: number, 
 }
 
 export async function createUser(data: NewUserFormData, creatorRole?: UserRole, isCreatorSuperAdmin?: boolean): Promise<User> {
-  // const hashedPassword = await bcrypt.hash(data.password, 10); // TODO: Use bcrypt
-  const hashedPassword = data.password; // Insecure placeholder
+  const hashedPassword = await bcrypt.hash(data.password, SALT_ROUNDS);
 
   // Prevent non-superadmin staff from creating Staff or SuperAdmin users
   if (creatorRole === 'Staff' && !isCreatorSuperAdmin && data.role === 'Staff') {
@@ -91,20 +93,14 @@ export async function createUser(data: NewUserFormData, creatorRole?: UserRole, 
   if (data.role === 'Student') {
     userToCreateData.student_profile = {
       create: {
-        // student_id will be auto-set to user_id by Prisma relation
         enrollment_date: new Date(), 
-        // department_id: 0, // TODO: Student needs a department, how to set this at creation?
-                          // For now, this will cause an error if department_id is not nullable or has no default.
-                          // Assuming department_id on Student can be null or has a default for this example.
-                          // Or it should be part of the NewUserFormData specific for students.
-                          // Temporarily allowing it to be null for now, will need schema adjustment or form update.
+        // department_id should be handled or made optional/nullable in schema or required in form
       },
     };
   } else if (data.role === 'Teacher') {
     userToCreateData.teacher_profile = {
       create: { 
-        // teacher_id will be auto-set
-        // department_id: 0, // TODO: Teacher needs a department.
+        // department_id should be handled
       },
     };
   } else if (data.role === 'Staff') {
@@ -159,12 +155,9 @@ export async function updateUser(userId: number, data: EditUserFormData, editorI
       throw new Error("Only a Super Admin can modify another Super Admin's basic details (not role/super_admin status).");
   }
   
-  // Prevent deactivating/changing role of self if super admin trying to demote/deactivate THEMSELVES
-  if (userToEdit.is_super_admin && userId === editorId && (data.role !== 'Staff' || !data.is_active)) {
-     // Allow super admin to change their own details (name, email) but not easily demote/deactivate self.
-     // This specific check might need refinement based on exact business rules for self-modification.
-     // For now, allow a super admin to change their own active status or role if desired.
-  }
+  // Note: This function does NOT handle password changes. 
+  // The EditUserFormData does not include password fields.
+  // Password changes should be a separate, dedicated action.
 
 
   try {
@@ -177,9 +170,7 @@ export async function updateUser(userId: number, data: EditUserFormData, editorI
         last_name: data.lastName,
         role: data.role,
         is_active: data.is_active,
-        // is_super_admin: (userToEdit.is_super_admin && userId === editorId) ? userToEdit.is_super_admin : (data.role === 'Staff' && editor?.is_super_admin ? (data.is_super_admin ?? false) : false),
-        // ^ Logic for is_super_admin needs careful thought. If it's set on user profile, it's simpler.
-        // Assuming is_super_admin is directly on User model and only editable by another super admin.
+        // is_super_admin handling needs careful consideration if it's part of EditUserFormData
       },
       include: {
         student_profile: true,
@@ -224,15 +215,7 @@ export async function deleteUser(userId: number, deleterId: number): Promise<voi
   try {
     // Need to handle cascading deletes or manually delete related profile data
     // if schema doesn't do it automatically or if you need specific cleanup.
-    // For Student, Teacher, Staff profiles, if they use user_id as @id and have a relation,
-    // Prisma might handle this based on `onDelete` rules in relations.
-    // If they are separate tables with foreign keys, explicit deletion might be needed if `onDelete` is not `Cascade`.
     
-    // Example: if student/teacher/staff profiles need manual deletion first:
-    // if (userToDelete.role === 'Student' && userToDelete.student_profile) await prisma.student.delete({ where: { student_id: userId }});
-    // if (userToDelete.role === 'Teacher' && userToDelete.teacher_profile) await prisma.teacher.delete({ where: { teacher_id: userId }});
-    // if (userToDelete.role === 'Staff' && userToDelete.staff_profile) await prisma.staff.delete({ where: { staff_id: userId }});
-
     await prisma.user.delete({
       where: { user_id: userId },
     });
